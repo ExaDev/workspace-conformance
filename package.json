@@ -1,0 +1,97 @@
+{
+  "name": "workspace-conformance",
+  "description": "Conformance checks for a pnpm workspace that ESLint cannot express: type-graph, import-graph and cross-file checks driven by the shared layout section of @exadev/config",
+  "version": "0.0.0",
+  "bin": {
+    "workspace-conformance": "./dist/cli.js"
+  },
+  "dependencies": {
+    "@exadev/config": "^1.0.0",
+    "cosmiconfig-extends": "^1.0.1",
+    "dependency-cruiser": "^18.4.0",
+    "tinyglobby": "^0.2.17",
+    "ts-morph": "^28.0.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
+    "@commitlint/types": "21.2.3",
+    "@eslint/js": "10.0.1",
+    "@exadev/eslint-config": "2.23.0",
+    "@semantic-release/changelog": "7.0.0",
+    "@semantic-release/git": "11.0.1",
+    "@stryker-mutator/api": "10.0.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/typescript-checker": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@types/node": "26.6.3",
+    "@vitest/coverage-v8": "4.1.11",
+    "cosmiconfig": "10.0.1",
+    "eslint": "10.11.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "publint": "0.3.24",
+    "semantic-release": "25.0.9",
+    "tsdown": "0.23.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/index.d.ts",
+        "require": "./dist/index.d.cts"
+      },
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "conformance",
+    "dependency-cruiser",
+    "exadev",
+    "monorepo",
+    "ts-morph",
+    "workspace"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "packageManager": "pnpm@12.4.1+sha512.2e81e399d73fe8390dab25e06aa788ab7a5908248d2f5a370f82b481147a6a7a367bf8048f9a6fdb6460f21a66f0542dedb8b94ca2c8723596741920b1656d4c",
+  "peerDependencies": {
+    "cosmiconfig": "^9.0.0 || ^10.0.0",
+    "typescript": ">=5.0.0 <7.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ExaDev/workspace-conformance.git"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "lint": "eslint . --fix --cache --max-warnings 0",
+    "lint:check": "eslint . --cache --max-warnings 0",
+    "prepare": "husky",
+    "prepublishOnly": "pnpm run lint:check && pnpm run typecheck && pnpm run test && tsdown && publint && attw --pack",
+    "release": "semantic-release",
+    "test": "vitest run",
+    "test:mutation": "stryker run stryker.config.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "types": "./dist/index.d.ts"
+}
