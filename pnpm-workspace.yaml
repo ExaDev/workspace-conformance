@@ -1,0 +1,7 @@
+# This is a single-package repo, not a real pnpm workspace: packages is deliberately empty. The file exists to carry pnpm settings.
+packages: []
+# Every development dependency add or update writes an exact version, never a range: a floating range lets a routine `pnpm install` silently resolve to a version nobody has reviewed. The runtime dependencies of the published package are the exception and use caret ranges (add them with `--save-exact=false`): an exact pin would stop a consumer taking a patch without a new release here, and would install a second copy beside any other version of the same package, so `instanceof` on its classes would fail across the copies.
+minimumReleaseAgeExclude:
+  - '@exadev/config'
+  - cosmiconfig-extends
+saveExact: true

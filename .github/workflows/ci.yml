@@ -1,0 +1,200 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancels a superseded run when a branch or PR gets pushed to again. Scoped away from main so a merge landing mid-release never kills the release job, which runs solely on a push to main.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  determine-runner:
+    uses: ./.github/workflows/determine-runner.yml
+
+  commitlint:
+    name: Commitlint
+    needs: determine-runner
+    runs-on: ${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      # Not wagoid/commitlint-github-action: it is a Docker container action, and the self-hosted fleet has no Docker daemon.
+      - run: pnpm install --frozen-lockfile
+      - name: Lint the commits of a pull request
+        if: github.event_name == 'pull_request'
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Lint the last commit of a push
+        if: github.event_name != 'pull_request'
+        run: pnpm exec commitlint --last
+
+  lint:
+    name: Lint
+    needs: determine-runner
+    runs-on: ${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: actions/cache@v6
+        with:
+          path: .eslintcache
+          # eslint.config.ts and pnpm-lock.yaml both invalidate the cache: a rule change or a dependency bump can change lint results even for files whose own content did not change.
+          key: eslintcache-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.ts') }}
+          restore-keys: eslintcache-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      # The check-only script: `pnpm lint` fixes in place, so it would exit 0 on a fixable violation that never reaches the commit.
+      - run: pnpm lint:check
+
+  typecheck:
+    name: Typecheck
+    needs: determine-runner
+    runs-on: ${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec publint
+      - run: pnpm exec attw --pack
+
+  mutation:
+    name: Mutation
+    # Manual only: run it from the Actions tab (workflow_dispatch) when a change warrants a full mutation pass. It is not a required check and does not gate a release.
+    if: github.event_name == 'workflow_dispatch'
+    needs: determine-runner
+    runs-on: ${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Content-diff based (Stryker's IncrementalDiffer text-diffs stored against current source, never hash, mtime or git ref), so restoring from an unrelated prior run is always safe: a mismatch only means bigger diffs and more reruns, never a wrongly skipped mutant.
+      - name: Restore Stryker incremental result cache
+        uses: actions/cache/restore@v6
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-incremental-${{ github.run_id }}
+          restore-keys: |
+            stryker-incremental-
+      # Stryker only diffs mutated and test files, so a change outside that scope (config, fixture data, an env var) is invisible to the incremental differ. --force on push to main (never on a PR) rebuilds the incremental file from a known-clean baseline so that blind spot cannot compound.
+      - run: pnpm test:mutation${{ github.ref == 'refs/heads/main' && ' --force' || '' }}
+      - name: Save Stryker incremental result cache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-incremental-${{ github.run_id }}
+
+  # The packed tarball, not the source tree, is what consumers install: this proves the published files, exports map, command line entry and peer dependencies work in a clean project on every Node line the package supports and on both cosmiconfig majors. The toolchain needs Node 22, so the package is built and packed on 22 and the consumer check runs on the Node under test.
+  package:
+    name: Package (Node ${{ matrix.node }}, cosmiconfig ${{ matrix.cosmiconfig }})
+    needs: determine-runner
+    runs-on: ${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { node: '20', cosmiconfig: '9' }
+          - { node: '22', cosmiconfig: '9' }
+          - { node: '22', cosmiconfig: '10' }
+          - { node: '24', cosmiconfig: '9' }
+          - { node: '24', cosmiconfig: '10' }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm pack --pack-destination "$RUNNER_TEMP/pack"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install the tarball into a scratch project and run the checks through it, as ESM, as CommonJS and as the command line
+        run: bash test/package/install-check.sh "$RUNNER_TEMP/pack" "${{ matrix.cosmiconfig }}" "$RUNNER_TEMP/scratch"
+
+  required-checks:
+    name: Required Checks
+    needs: [determine-runner, commitlint, lint, typecheck, package]
+    # Always runs, even if a dependency failed, so it reports that failure itself rather than being skipped: a required check that is silently absent blocks a PR indefinitely instead of failing it visibly.
+    if: always()
+    runs-on: ${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any required job failed or was cancelled
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more required jobs did not succeed:"
+            echo '${{ toJSON(needs) }}'
+            exit 1
+          fi
+
+  release:
+    name: Release
+    needs: [commitlint, lint, typecheck, package]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Deliberately a GitHub-hosted runner, not the resolved one: npm trusted publishing only works from GitHub-hosted runners, so the OIDC token exchange cannot happen on the self-hosted fleet or Blacksmith.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # to push the release commit and tag and create the GitHub Release
+      issues: write # to comment on released issues
+      pull-requests: write # to comment on released pull requests
+      id-token: write # OIDC identity for npm trusted publishing and provenance (no NPM_TOKEN)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # semantic-release analyses the full commit history since the last release.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+          # registry-url is deliberately absent: setup-node would otherwise write an .npmrc _authToken line that wins over the OIDC token exchange, breaking trusted publishing.
+      - run: pnpm install --frozen-lockfile
+      - name: Upgrade npm for OIDC trusted publishing (needs npm CLI >=11.5.1)
+        run: npm install -g npm@latest
+      - name: Release
+        # HUSKY=0 so the commit-msg hook never fires against the automated release commit.
+        run: HUSKY=0 pnpm exec semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Blanked, not omitted: an inherited NPM_TOKEN or NODE_AUTH_TOKEN would otherwise be used in preference to the OIDC exchange.
+          NPM_TOKEN: ''
+          NODE_AUTH_TOKEN: ''
