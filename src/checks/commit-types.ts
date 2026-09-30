@@ -13,20 +13,40 @@ function stringsOf(value: unknown): readonly string[] | undefined {
 }
 
 /**
- * The types listed in commitlint's `type-enum` rule, or `undefined` when the config does not set the rule and so takes the types of its preset.
+ * What commitlint's `type-enum` rule says about the commit types.
  */
-function commitTypesOf(config: Readonly<Record<string, unknown>>, file: string): readonly string[] | undefined {
+interface CommitTypeRule {
+  /**
+   * The types the rule lists as the only accepted ones, or `undefined` when the rule does not enumerate them (it forbids some, or is off).
+   */
+  readonly enumerated: readonly string[] | undefined;
+  /**
+   * Whether commitlint accepts a commit of this type.
+   */
+  readonly accepts: (type: string) => boolean;
+}
+
+const RULE_OFF = 0;
+
+/**
+ * The `type-enum` rule of the commitlint config, or `undefined` when the config does not set it and so takes the rule of its preset. The rule is `[level, condition, types]`: `'always'` lists the only accepted types, `'never'` lists forbidden ones (every other type is accepted), and level 0 switches the rule off (every type is accepted).
+ */
+function commitTypeRule(config: Readonly<Record<string, unknown>>, file: string): CommitTypeRule | undefined {
   const rules = config['rules'];
   if (!isRecord(rules) || !('type-enum' in rules)) {
     return undefined;
   }
-  const rule = rules['type-enum'];
-  const types = Array.isArray(rule) ? stringsOf(rule[2]) : undefined;
-  if (types === undefined) {
-    throw new ConformanceError(`${file}: the 'type-enum' rule must be written as [level, 'always', [types]] for its types to be read`);
+  const rule: unknown = rules['type-enum'];
+  const [level, condition, listed]: readonly unknown[] = Array.isArray(rule) ? rule.map((part: unknown) => part) : [];
+  const types = stringsOf(listed);
+  if (typeof level !== 'number' || (condition !== 'always' && condition !== 'never') || types === undefined) {
+    throw new ConformanceError(`${file}: the 'type-enum' rule must be written as [level, 'always' or 'never', [types]] for its types to be read`);
+  }
+  if (level === RULE_OFF) {
+    return { enumerated: undefined, accepts: () => true };
   }
 
-  return types;
+  return condition === 'always' ? { enumerated: types, accepts: (type) => types.includes(type) } : { enumerated: undefined, accepts: (type) => !types.includes(type) };
 }
 
 /**
@@ -79,7 +99,7 @@ function isCustom(type: string): boolean {
 }
 
 /**
- * The commit types commitlint accepts are accounted for in the release config. A type no preset knows must have a release rule and, when the config lists changelog sections (`presetConfig.types` of the release notes generator), a section, or it can be committed and never released or shown; a release rule or changelog section for a type commitlint rejects can never apply. A preset type may be left out of either list: leaving out a type that does not release is how a release rule list is normally written.
+ * The commit types commitlint accepts are accounted for in the release config. A type no preset knows must have a release rule and, when the config lists changelog sections (`presetConfig.types` of the release notes generator), a section, or it can be committed and never released or shown; a release rule or changelog section for a type commitlint rejects can never apply. Types are enumerated only by a `type-enum` rule of the form `[level, 'always', [types]]`; a `'never'` rule forbids the types it lists and enumerates none, and a rule that is off (level 0) accepts every type. A preset type may be left out of either list: leaving out a type that does not release is how a release rule list is normally written.
  *
  * It compares only what is written. The check has nothing to say when the commit types are the preset's and every listed type is one of them. A commitlint config that does not set `type-enum` while the release config lists a type no preset knows is a violation, since the commit types cannot then be read. Both configs are evaluated, so a list may be derived from one shared constant.
  */
@@ -102,7 +122,7 @@ export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, opti
   const releaseRules = typesOfEntries(pluginOptions(release, COMMIT_ANALYZER)?.['releaseRules'], releaseFile, 'releaseRules');
   const presetConfig = pluginOptions(release, RELEASE_NOTES_GENERATOR)?.['presetConfig'];
   const changelog = typesOfEntries(isRecord(presetConfig) ? presetConfig['types'] : undefined, releaseFile, 'presetConfig.types');
-  const accepted = commitTypesOf(commitlint, commitlintFile);
+  const accepted = commitTypeRule(commitlint, commitlintFile);
   if (accepted === undefined) {
     const unknown = [releaseRules, changelog].flatMap((list) => list ?? []).filter(isCustom);
     if (unknown.length > 0) {
@@ -121,7 +141,7 @@ export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, opti
     { listed: changelog, required: changelog !== undefined, noun: 'changelog section', absent: 'no-changelog-section', extra: 'changelog-section-not-a-commit-type' },
   ];
   for (const { listed, required, noun, absent, extra } of lists) {
-    for (const type of required ? accepted.filter(isCustom) : []) {
+    for (const type of required ? (accepted.enumerated ?? []).filter(isCustom) : []) {
       if (listed?.includes(type) !== true) {
         violations.push({
           code: `commit-types/${absent}`,
@@ -130,10 +150,8 @@ export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, opti
         });
       }
     }
-    if (listed !== undefined) {
-      for (const type of listed.filter((candidate) => !accepted.includes(candidate))) {
-        violations.push({ code: `commit-types/${extra}`, message: `'${type}' has a ${noun} in ${releaseFile} but is not a commit type in ${commitlintFile}`, file: commitlintFile });
-      }
+    for (const type of (listed ?? []).filter((candidate) => !accepted.accepts(candidate))) {
+      violations.push({ code: `commit-types/${extra}`, message: `'${type}' has a ${noun} in ${releaseFile} but is not a commit type in ${commitlintFile}`, file: commitlintFile });
     }
   }
 
