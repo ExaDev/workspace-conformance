@@ -1,8 +1,8 @@
 import { ConfigValidationError, type LayoutConfig } from '@exadev/config';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { importsLayout } from '../test/support/layouts';
-import { fixturePath } from '../test/support/temp';
+import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../test/support/temp';
 import type { ConformanceConfig } from './config';
 import { ConformanceError } from './errors';
 import { EXIT_CODES, runChecks } from './run-checks';
@@ -12,6 +12,8 @@ const clean = fixturePath('imports', 'clean');
 const importChecks: ConformanceConfig = {
   checks: { 'import-uphill': {}, 'import-rank-skip': {}, 'import-cross-slice': {}, 'import-isolated-groups': {}, 'import-cycles': {} },
 };
+
+afterEach(removeTempDirs);
 
 describe('runChecks with the sections supplied', () => {
   it('runs every enabled check in registry order and exits 1 when any finds a violation', async () => {
@@ -96,5 +98,21 @@ describe('runChecks loading the sections from the working directory', () => {
 
   it('fails when a section is defined in both files', async () => {
     await expect(runChecks({ cwd: fixturePath('duplicate') })).rejects.toThrow('defined in both');
+  });
+});
+
+describe('runChecks with configFiles', () => {
+  it('applies the alias to the config files a check evaluates, as it does to the sections', async () => {
+    const shared = await makeTempDir();
+    const workspace = await makeTempDir();
+    await writeFiles(shared, { 'types.ts': "export const types = ['feat', 'fix'];\n" });
+    await writeFiles(workspace, {
+      'commitlint.config.ts': "import { types } from '@shared/types';\nexport default { rules: { 'type-enum': [2, 'always', types] } };\n",
+      'release.config.ts': 'export default {};\n',
+    });
+    const config: ConformanceConfig = { checks: { 'commit-types': {} } };
+
+    expect((await runChecks({ cwd: workspace, config, configFiles: { alias: { '@shared': shared } } })).violations).toEqual([]);
+    await expect(runChecks({ cwd: workspace, config })).rejects.toThrow();
   });
 });

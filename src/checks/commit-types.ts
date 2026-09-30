@@ -1,3 +1,5 @@
+import type { ConfigFileOptions } from '@exadev/config';
+
 import type { CheckFunction, Violation } from '../check';
 import { evaluateConfigFile, isRecord } from '../config-files';
 import { ConformanceError } from '../errors';
@@ -77,8 +79,8 @@ function typesOfEntries(entries: unknown, file: string, what: string): readonly 
   return entries.flatMap((entry) => (isRecord(entry) && typeof entry['type'] === 'string' ? [entry['type']] : []));
 }
 
-async function readObject(cwd: string, file: string): Promise<Readonly<Record<string, unknown>> | undefined> {
-  const config = await evaluateConfigFile(cwd, file);
+async function readObject(cwd: string, file: string, configFiles: ConfigFileOptions | undefined): Promise<Readonly<Record<string, unknown>> | undefined> {
+  const config = await evaluateConfigFile(cwd, file, configFiles);
   if (config === undefined) {
     return undefined;
   }
@@ -103,11 +105,11 @@ function isCustom(type: string): boolean {
  *
  * It compares only what is written. The check has nothing to say when the commit types are the preset's and every listed type is one of them. A commitlint config that does not set `type-enum` while the release config lists a type no preset knows is a violation, since the commit types cannot then be read. Both configs are evaluated, so a list may be derived from one shared constant.
  */
-export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, options }) => {
+export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, options, configFiles }) => {
   const commitlintFile = options.commitlint ?? DEFAULT_COMMITLINT_CONFIG;
   const releaseFile = options.release ?? DEFAULT_RELEASE_CONFIG;
-  const commitlint = await readObject(cwd, commitlintFile);
-  const release = await readObject(cwd, releaseFile);
+  const commitlint = await readObject(cwd, commitlintFile, configFiles);
+  const release = await readObject(cwd, releaseFile, configFiles);
   const violations: Violation[] = [];
   if (commitlint === undefined) {
     violations.push({ code: 'commit-types/missing-config', message: `${commitlintFile} does not exist`, file: commitlintFile });

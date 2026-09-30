@@ -1,4 +1,4 @@
-import type { LayoutConfig } from '@exadev/config';
+import type { ConfigFileOptions, LayoutConfig } from '@exadev/config';
 
 import type { CheckFunction, LayoutCheckFunction, Violation } from './check';
 import { aggregateMappers } from './checks/aggregate-mappers';
@@ -23,6 +23,7 @@ export interface RunInput {
   readonly cwd: string;
   readonly checks: ChecksConfig;
   readonly layout: LayoutConfig | undefined;
+  readonly configFiles: ConfigFileOptions | undefined;
 }
 
 /**
@@ -60,13 +61,13 @@ function plain<Name extends CheckName, Options>(spec: {
     description: spec.description,
     requiresLayout: false,
     isEnabled: (checks) => spec.select(checks) !== undefined,
-    run: async ({ cwd, checks }) => {
+    run: async ({ cwd, checks, configFiles }) => {
       const options = spec.select(checks);
       if (options === undefined) {
         throw new ConformanceError(`the check '${spec.name}' is not enabled`);
       }
 
-      return spec.check({ cwd, options });
+      return spec.check({ cwd, options, ...(configFiles === undefined ? {} : { configFiles }) });
     },
   };
 }

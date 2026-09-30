@@ -32,12 +32,12 @@ describe('registry', () => {
   });
 
   it('refuses to run a check that is not enabled', async () => {
-    await expect(registry['single-storybook'].run({ cwd: '.', checks: {}, layout: undefined })).rejects.toThrow(ConformanceError);
-    await expect(registry['import-uphill'].run({ cwd: '.', checks: {}, layout: undefined })).rejects.toThrow("'import-uphill' is not enabled");
+    await expect(registry['single-storybook'].run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined })).rejects.toThrow(ConformanceError);
+    await expect(registry['import-uphill'].run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined })).rejects.toThrow("'import-uphill' is not enabled");
   });
 
   it('refuses to run a layout check without the layout', async () => {
-    await expect(registry['import-uphill'].run({ cwd: '.', checks: { 'import-uphill': {} }, layout: undefined })).rejects.toThrow('reads the workspace layout');
+    await expect(registry['import-uphill'].run({ cwd: '.', checks: { 'import-uphill': {} }, layout: undefined, configFiles: undefined })).rejects.toThrow('reads the workspace layout');
   });
 });
 
