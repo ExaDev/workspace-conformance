@@ -134,11 +134,8 @@ describe('commit-types', () => {
     expect(await run('non-releasing-omitted')).toEqual([]);
   });
 
-  it('reports a type no preset knows when the release config lists no rules at all', async () => {
-    expect((await run('custom-without-rules')).map((violation) => [violation.code, violation.file])).toEqual([
-      ['commit-types/no-release-rule', 'release.config.ts'],
-      ['commit-types/no-changelog-section', 'release.config.ts'],
-    ]);
+  it('reports a type no preset knows when the release config lists no rules at all, and asks for no changelog section when none are listed', async () => {
+    expect((await run('custom-without-rules')).map((violation) => [violation.code, violation.file])).toEqual([['commit-types/no-release-rule', 'release.config.ts']]);
   });
 
   it('reports a type without a release rule or a changelog section, and one that commitlint would reject', async () => {
