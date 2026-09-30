@@ -203,6 +203,57 @@ describe('dockerfile-package-manager', () => {
     expect(violations.map((violation) => violation.file)).toEqual(['Dockerfile']);
   });
 
+  describe('a pin that refers to a variable', () => {
+    const packageJson = '{ "packageManager": "pnpm@10.4.1+sha512.abc" }';
+
+    async function violationsOf(dockerfile: string): Promise<readonly (readonly [string, number])[]> {
+      const cwd = await makeTempDir();
+      await writeFiles(cwd, { 'package.json': packageJson, Dockerfile: dockerfile });
+
+      return (await dockerfilePackageManager({ cwd, options: {} })).map((violation) => [violation.message, violation.location?.line ?? 0]);
+    }
+
+    it('accepts a variable whose value is the declared version, however it is written or set', async () => {
+      const dockerfile = [
+        'ARG PNPM_VERSION=10.4.1',
+        'RUN corepack prepare pnpm@${PNPM_VERSION} --activate',
+        'RUN npm i -g pnpm@$PNPM_VERSION',
+        'ENV PNPM_VERSION="10.4.1+sha512.abc"',
+        'RUN npm i -g pnpm@${PNPM_VERSION}',
+        'ENV OTHER 10.4.1',
+        'RUN npm i -g pnpm@$OTHER',
+        'ENV A=1 B=10.4.1',
+        'RUN npm i -g pnpm@$B',
+      ].join('\n');
+
+      expect(await violationsOf(dockerfile)).toEqual([]);
+    });
+
+    it('compares the value in effect at the pin', async () => {
+      const dockerfile = ['ARG PNPM_VERSION=10.4.1', 'RUN npm i -g pnpm@$PNPM_VERSION', 'ARG PNPM_VERSION=9.0.0', 'RUN npm i -g pnpm@$PNPM_VERSION'].join('\n');
+
+      expect(await violationsOf(dockerfile)).toEqual([['Dockerfile pins pnpm@9.0.0 but packageManager in package.json is pnpm@10.4.1', dockerfile.split('\n').length]]);
+    });
+
+    it('does not compare a variable the file gives no value', async () => {
+      const dockerfile = ['ARG PNPM_VERSION', 'RUN npm i -g pnpm@$PNPM_VERSION', 'RUN npm i -g pnpm@${UNSET}', 'ENV NESTED=$PNPM_VERSION', 'RUN npm i -g pnpm@$NESTED'].join('\n');
+
+      expect(await violationsOf(dockerfile)).toEqual([]);
+    });
+  });
+
+  describe('what counts as a pin', () => {
+    it('stops the version at punctuation and does not read a longer package name as a package manager', async () => {
+      const cwd = await makeTempDir();
+      await writeFiles(cwd, {
+        'package.json': '{ "packageManager": "pnpm@10.4.1" }',
+        Dockerfile: ['RUN echo "pnpm@10.4.1," && pnpm dlx create-pnpm@1.0.0', 'RUN npm i -g @scope/pnpm@2.0.0 pnpm@10.4.1;'].join('\n'),
+      });
+
+      expect(await dockerfilePackageManager({ cwd, options: {} })).toEqual([]);
+    });
+  });
+
   it('reports a package.json with no packageManager', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, { 'package.json': '{ "name": "x" }' });
