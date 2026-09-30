@@ -5,6 +5,8 @@ const SLOW_WORK_TIMEOUT_MS = 30_000;
 
 const config: ViteUserConfig = defineConfig({
   test: {
+    // Runs first in every test worker, before any fixture touches git.
+    setupFiles: ['test/support/isolate-git.ts'],
     testTimeout: SLOW_WORK_TIMEOUT_MS,
     hookTimeout: SLOW_WORK_TIMEOUT_MS,
     coverage: {

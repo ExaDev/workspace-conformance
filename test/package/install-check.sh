@@ -2,6 +2,8 @@
 # Installs the packed tarball into a scratch project that holds a small workspace with known violations, and runs the checks through it as ESM, as CommonJS and as the command line.
 # Usage: install-check.sh <directory holding the .tgz> <cosmiconfig major> <scratch directory>
 set -euo pipefail
+# A caller that is itself a git hook exports the repository it runs for, which would make the `git init` below act on that repository.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE
 
 pack_dir=$1
 cosmiconfig_major=$2
