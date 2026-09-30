@@ -120,22 +120,33 @@ describe('commit-types', () => {
     expect(await run('derived')).toEqual([]);
   });
 
-  it('accepts a release config that lists no types, since there is nothing to compare', async () => {
+  it('accepts a release config that lists no types when every commit type is a preset type', async () => {
     expect(await run('preset-only')).toEqual([]);
+  });
+
+  it('accepts preset types left out of the release rules, since a type that does not release needs no rule', async () => {
+    expect(await run('non-releasing-omitted')).toEqual([]);
+  });
+
+  it('reports a type no preset knows when the release config lists no rules at all', async () => {
+    expect((await run('custom-without-rules')).map((violation) => [violation.code, violation.file])).toEqual([
+      ['commit-types/no-release-rule', 'release.config.ts'],
+      ['commit-types/no-changelog-section', 'release.config.ts'],
+    ]);
   });
 
   it('reports a type without a release rule or a changelog section, and one that commitlint would reject', async () => {
     const violations = await run('violating');
 
     expect(violations.map((violation) => [violation.code, violation.file, violation.message])).toEqual([
-      ['commit-types/no-release-rule', 'release.config.ts', "'deps' is a commit type in commitlint.config.ts with no release rule in release.config.ts"],
+      ['commit-types/no-release-rule', 'release.config.ts', "'deps' is a commit type in commitlint.config.ts that no preset knows, and release.config.ts has no release rule for it"],
       ['commit-types/release-rule-not-a-commit-type', 'commitlint.config.ts', "'perf' has a release rule in release.config.ts but is not a commit type in commitlint.config.ts"],
-      ['commit-types/no-changelog-section', 'release.config.ts', "'deps' is a commit type in commitlint.config.ts with no changelog section in release.config.ts"],
+      ['commit-types/no-changelog-section', 'release.config.ts', "'deps' is a commit type in commitlint.config.ts that no preset knows, and release.config.ts has no changelog section for it"],
       ['commit-types/changelog-section-not-a-commit-type', 'commitlint.config.ts', "'docs' has a changelog section in release.config.ts but is not a commit type in commitlint.config.ts"],
     ]);
   });
 
-  it('reports release rules that cannot be compared with a commitlint config that sets no type-enum', async () => {
+  it('reports a release rule for a type no preset knows when commitlint sets no type-enum, since the commit types cannot be read', async () => {
     expect((await run('no-type-enum')).map((violation) => violation.code)).toEqual(['commit-types/no-type-enum']);
   });
 

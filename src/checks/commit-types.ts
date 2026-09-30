@@ -69,14 +69,19 @@ async function readObject(cwd: string, file: string): Promise<Readonly<Record<st
   return config;
 }
 
-function difference(left: readonly string[], right: readonly string[]): readonly string[] {
-  return left.filter((type) => !right.includes(type));
+/**
+ * The commit types the conventional presets know, which is the `type-enum` of `@commitlint/config-conventional` and the type list the conventional changelog presets label. Their release behaviour is the preset's own, so a preset type needs no release rule or changelog section to be accounted for; a type outside this list does.
+ */
+export const PRESET_COMMIT_TYPES: readonly string[] = ['build', 'chore', 'ci', 'docs', 'feat', 'fix', 'perf', 'refactor', 'revert', 'style', 'test'];
+
+function isCustom(type: string): boolean {
+  return !PRESET_COMMIT_TYPES.includes(type);
 }
 
 /**
- * The commit types commitlint accepts equal the types with a release rule, and, when the release config lists changelog sections, the types with a section. A type in one list and not the other either cannot be committed or never releases.
+ * The commit types commitlint accepts are accounted for in the release config. A type no preset knows must have a release rule and, when the config lists changelog sections, a section, or it can be committed and never released or shown; a release rule or changelog section for a type commitlint rejects can never apply. A preset type may be left out of either list: leaving out a type that does not release is how a release rule list is normally written.
  *
- * It compares only what is written. A release config with neither `releaseRules` nor `presetConfig.types` has nothing to compare and passes, and a commitlint config that does not set `type-enum` while the release config lists types is a violation, since the lists cannot then be compared. Both configs are evaluated, so a list may be derived from one shared constant.
+ * It compares only what is written. The check has nothing to say when the commit types are the preset's and every listed type is one of them. A commitlint config that does not set `type-enum` while the release config lists a type no preset knows is a violation, since the commit types cannot then be read. Both configs are evaluated, so a list may be derived from one shared constant.
  */
 export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, options }) => {
   const commitlintFile = options.commitlint ?? DEFAULT_COMMITLINT_CONFIG;
@@ -97,12 +102,18 @@ export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, opti
   const releaseRules = typesOfEntries(pluginOptions(release, COMMIT_ANALYZER)?.['releaseRules'], releaseFile, 'releaseRules');
   const presetConfig = pluginOptions(release, RELEASE_NOTES_GENERATOR)?.['presetConfig'];
   const changelog = typesOfEntries(isRecord(presetConfig) ? presetConfig['types'] : undefined, releaseFile, 'presetConfig.types');
-  if (releaseRules === undefined && changelog === undefined) {
-    return violations;
-  }
   const accepted = commitTypesOf(commitlint, commitlintFile);
   if (accepted === undefined) {
-    return [{ code: 'commit-types/no-type-enum', message: `${releaseFile} lists commit types but ${commitlintFile} sets no 'type-enum' rule, so the lists cannot be compared`, file: commitlintFile }];
+    const unknown = [releaseRules, changelog].flatMap((list) => list ?? []).filter(isCustom);
+    if (unknown.length > 0) {
+      violations.push({
+        code: 'commit-types/no-type-enum',
+        message: `${releaseFile} lists ${unknown.map((type) => `'${type}'`).join(', ')}, which no preset knows, but ${commitlintFile} sets no 'type-enum' rule, so the commit types cannot be read`,
+        file: commitlintFile,
+      });
+    }
+
+    return violations;
   }
 
   const lists = [
@@ -110,11 +121,17 @@ export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, opti
     { listed: changelog, noun: 'changelog section', absent: 'no-changelog-section', extra: 'changelog-section-not-a-commit-type' },
   ];
   for (const { listed, noun, absent, extra } of lists) {
-    if (listed !== undefined) {
-      for (const type of difference(accepted, listed)) {
-        violations.push({ code: `commit-types/${absent}`, message: `'${type}' is a commit type in ${commitlintFile} with no ${noun} in ${releaseFile}`, file: releaseFile });
+    for (const type of accepted.filter(isCustom)) {
+      if (listed?.includes(type) !== true) {
+        violations.push({
+          code: `commit-types/${absent}`,
+          message: `'${type}' is a commit type in ${commitlintFile} that no preset knows, and ${releaseFile} has no ${noun} for it`,
+          file: releaseFile,
+        });
       }
-      for (const type of difference(listed, accepted)) {
+    }
+    if (listed !== undefined) {
+      for (const type of listed.filter((candidate) => !accepted.includes(candidate))) {
         violations.push({ code: `commit-types/${extra}`, message: `'${type}' has a ${noun} in ${releaseFile} but is not a commit type in ${commitlintFile}`, file: commitlintFile });
       }
     }
