@@ -1,7 +1,7 @@
 import { realpath } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
-import type { IViolation } from 'dependency-cruiser';
+import type { IAvailableTranspiler, IViolation } from 'dependency-cruiser';
 import type { ParsedCommandLine } from 'typescript';
 
 import type { LayoutCheckContext, Violation } from '../check';
@@ -71,6 +71,17 @@ function withBaseUrl(parsed: ParsedCommandLine, tsConfigFile: string): ParsedCom
 }
 
 /**
+ * Throws `ConformanceError` unless dependency-cruiser can load the installed TypeScript. Without it dependency-cruiser cruises no `.ts` file and reports success, so every import check would pass whatever the workspace imports.
+ */
+function assertTypeScriptAvailable(transpilers: readonly IAvailableTranspiler[]): void {
+  const typescript = transpilers.find((transpiler) => transpiler.name === 'typescript');
+  if (typescript?.available !== true) {
+    const supported = typescript === undefined ? 'a version it supports' : `a version in ${typescript.version}`;
+    throw new ConformanceError(`dependency-cruiser cannot load TypeScript, so the import checks would find no TypeScript file and report nothing; install ${supported} as the 'typescript' of this workspace`);
+  }
+}
+
+/**
  * The violations of `rules` among the files of `packages`. The graph is limited to the packages' own files, so nothing outside them is a dependant or a dependency.
  *
  * The base directory is the real path of the root: dependency-cruiser resolves symbolic links, so the path of a file behind one would otherwise not be relative to it.
@@ -90,7 +101,8 @@ export async function cruiseViolations(input: {
   }
   const tsConfigFile = options.tsConfig === undefined ? undefined : resolve(cwd, options.tsConfig);
   // dependency-cruiser is an ES module only, so it is imported dynamically: a static import would make the CommonJS build of this package fail to load.
-  const { cruise } = await import('dependency-cruiser');
+  const { cruise, getAvailableTranspilers } = await import('dependency-cruiser');
+  assertTypeScriptAvailable(getAvailableTranspilers());
   const { default: extractTsConfig } = await import('dependency-cruiser/config-utl/extract-ts-config');
   const result = await cruise(
     packages.map((member) => member.dir),
