@@ -138,6 +138,36 @@ describe('commit-types', () => {
     expect((await run('custom-without-rules')).map((violation) => [violation.code, violation.file])).toEqual([['commit-types/no-release-rule', 'release.config.ts']]);
   });
 
+  describe('a type-enum rule that does not list the accepted types', () => {
+    const release = `export default { plugins: [['@semantic-release/commit-analyzer', { releaseRules: [{ type: 'feat', release: 'minor' }] }], '@semantic-release/release-notes-generator'] };`;
+
+    async function codesOf(rule: string): Promise<readonly string[]> {
+      const cwd = await makeTempDir();
+      await writeFiles(cwd, {
+        'commitlint.config.ts': `export default { extends: ['@commitlint/config-conventional'], rules: { 'type-enum': ${rule} } };`,
+        'release.config.ts': release,
+      });
+
+      return (await commitTypes({ cwd, options: {} })).map((violation) => violation.code);
+    }
+
+    it('reads a never rule as forbidding types, so its types need no release rule or section', async () => {
+      expect(await codesOf("[2, 'never', ['wip']]")).toEqual([]);
+    });
+
+    it('reports a release rule for a type a never rule forbids', async () => {
+      expect(await codesOf("[2, 'never', ['feat']]")).toEqual(['commit-types/release-rule-not-a-commit-type']);
+    });
+
+    it('reads a rule that is off as accepting every type', async () => {
+      expect(await codesOf("[0, 'always', ['fix', 'deps']]")).toEqual([]);
+    });
+
+    it('rejects a rule whose condition is neither always nor never', async () => {
+      await expect(codesOf("[2, 'sometimes', ['feat']]")).rejects.toThrow("must be written as [level, 'always' or 'never', [types]]");
+    });
+  });
+
   it('reports a type without a release rule or a changelog section, and one that commitlint would reject', async () => {
     const violations = await run('violating');
 
