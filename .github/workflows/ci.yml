@@ -127,11 +127,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { node: '20', cosmiconfig: '9' }
           - { node: '22', cosmiconfig: '9' }
           - { node: '22', cosmiconfig: '10' }
           - { node: '24', cosmiconfig: '9' }
           - { node: '24', cosmiconfig: '10' }
+          - { node: '26', cosmiconfig: '10' }
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

@@ -10,7 +10,7 @@ It complements the workspace architecture rules of [`@exadev/eslint-config`](htt
 pnpm add -D workspace-conformance @exadev/config cosmiconfig 'typescript@^6'
 ```
 
-`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`^5.9.0 || ^6.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7 (the range is in the install command because an unpinned `typescript` installs a newer major, which pnpm only warns about); the import checks fail with a configuration error when dependency-cruiser cannot load it. ts-morph bundles its own compiler and does not use yours. The package supports Node 20 and later.
+`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`^5.9.0 || ^6.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7 (the range is in the install command because an unpinned `typescript` installs a newer major, which pnpm only warns about); the import checks fail with a configuration error when dependency-cruiser cannot load it. ts-morph bundles its own compiler and does not use yours. The package supports the Node lines dependency-cruiser and its own dependencies support: 22.13 and later 22, 24, and 26 and later.
 
 Configure the checks in `exadev.config.ts`:
 
@@ -207,7 +207,7 @@ The map is an object literal assigned to a variable of that name, with an option
 
 ## Development
 
-Requires Node 22 or later for the toolchain and pnpm. The published package supports Node 20 and later.
+Requires Node 22.13 or later for the toolchain and pnpm. The published package supports the same lines as its dependency-cruiser dependency (`engines` in `package.json`), and the packaged-install check installs it with `engine-strict`, so a wider claim than the dependency tree allows fails CI.
 
 ```sh
 pnpm install
