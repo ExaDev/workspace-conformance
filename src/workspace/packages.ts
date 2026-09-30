@@ -178,7 +178,12 @@ export async function workspacePatterns(root: string, layout: LayoutConfig): Pro
 }
 
 async function readName(manifest: string): Promise<string | undefined> {
-  const content: unknown = JSON.parse(await readFile(manifest, 'utf8'));
+  let content: unknown;
+  try {
+    content = JSON.parse(await readFile(manifest, 'utf8'));
+  } catch (error) {
+    throw new ConformanceError(`${manifest} cannot be read as JSON`, { cause: error });
+  }
   if (typeof content === 'object' && content !== null && 'name' in content && typeof content.name === 'string') {
     return content.name;
   }
