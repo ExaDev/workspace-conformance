@@ -86,6 +86,7 @@ How an import is attributed to a package, and the limits of that:
 
 - An import that dependency-cruiser resolves to a file counts against the package whose directory holds the file. A relative import resolves without an install, a path alias needs `tsConfig` (`paths` without `baseUrl` resolves relative to that tsconfig, wherever the command runs), and a package name resolves through the `node_modules` link pnpm makes for a workspace package and the package's `exports` or `main`.
 - An import of a workspace package by its name (or a subpath of it) that resolves to no file, because the workspace is not installed or the package's entry point is not built, is attributed to the package by name. An import that neither resolves nor names a workspace package, such as an alias without `tsConfig` that is not a package name, is not seen, so a check can look cleaner than the workspace is; give `tsConfig` when aliases are used.
+- `import-cycles` follows files, so it cannot follow an import that resolves to no file. It treats packages that import each other by such names as a cycle between the packages, and finds it only when every import in the ring is of that kind; a ring that mixes such imports with imports that resolve to files is not seen until the workspace is installed and built.
 - Type-only imports and dynamic `import()` count, because a type dependency is still a dependency.
 - Test and tooling files inside a package are part of the package. Use `exclude` for paths that may cross layers.
 - dependency-cruiser supports TypeScript below 7.
@@ -96,7 +97,7 @@ How an import is attributed to a package, and the limits of that:
 | `import-rank-skip` | No package imports one more than `rankSkip.maxDistance` ranks below it, except an exempt rank. Needs `rankSkip` in the layout. |
 | `import-cross-slice` | No package imports a package with a different slice. A package without a slice is in none and is never restricted. Needs a slice in the layout. |
 | `import-isolated-groups` | No package imports a package in a group that `isolatedGroups` pairs with its own, in either direction. Needs `isolatedGroups`. |
-| `import-cycles` | No files of the workspace packages import each other in a cycle. Each cycle is reported once. File level, not package level, and it includes type-only cycles. |
+| `import-cycles` | No files of the workspace packages import each other in a cycle, and no packages import each other by names that resolve to no file. Each cycle is reported once, starting from its smallest path, and two different rings over the same files are two cycles. It includes type-only cycles. |
 
 The ESLint rules and this tool overlap deliberately on rank, rank skip, slice and isolation; ESLint gives instant feedback on declared dependencies and this tool catches the imports that bypass a declaration.
 
