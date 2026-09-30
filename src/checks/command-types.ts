@@ -77,7 +77,7 @@ function problem(
  * The schema is recognised by type, so it may be imported from another file or renamed; it does not need to come from Zod. A union of the commands is not a command: list its name in `exclude`.
  */
 export const commandTypes: CheckFunction<CommandTypesOptions> = async ({ cwd, options }) => {
-  const { project, files } = await createProject(cwd, options.tsConfig, options.commands);
+  const { project, files } = await createProject(cwd, options.tsConfig, options.commands, { check: 'command-types', files: 'commands' });
   const excluded = new Set(options.exclude);
   const inferences = options.inferences ?? DEFAULT_INFERENCES;
   const seen = new Set<ExportedType>();

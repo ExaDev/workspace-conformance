@@ -73,14 +73,22 @@ describe('aggregate-mappers', () => {
   });
 
   it('fails when no contract file matches, so a mistyped glob is not a pass', async () => {
-    await expect(aggregateMappers({ cwd: clean, options: { ...aggregateOptions, contracts: ['nowhere/*.ts'] } })).rejects.toThrow(ConformanceError);
+    const missing = aggregateMappers({ cwd: clean, options: { ...aggregateOptions, contracts: ['nowhere/*.ts'] } });
+
+    await expect(missing).rejects.toThrow(ConformanceError);
+    await expect(missing).rejects.toThrow(/^checks\.aggregate-mappers\.contracts: no file matches$/u);
   });
 
   it('fails when the tsconfig does not exist', async () => {
     const empty = await makeTempDir();
     await writeFiles(empty, { 'a.ts': 'export interface A { readonly id: string }' });
 
-    await expect(aggregateMappers({ cwd: empty, options: { contracts: ['a.ts'], mapper: 'x/{name}.ts' } })).rejects.toThrow('does not exist');
+    await expect(aggregateMappers({ cwd: empty, options: { contracts: ['a.ts'], mapper: 'x/{name}.ts' } })).rejects.toThrow(
+      "checks.aggregate-mappers: the working directory has no tsconfig.json; name one with the 'tsConfig' option",
+    );
+    await expect(commandTypes({ cwd: empty, options: { commands: ['a.ts'], tsConfig: 'SECRETTSCONFIG9.json' } })).rejects.toThrow(
+      /^checks\.command-types\.tsConfig: the file does not exist$/u,
+    );
   });
 });
 
