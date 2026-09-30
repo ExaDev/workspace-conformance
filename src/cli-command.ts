@@ -21,7 +21,7 @@ Runs the conformance checks enabled in the 'conformance' section of exadev.confi
   --cwd <directory>   Directory that holds the config files. Defaults to the current directory.
   --check <name>      Run only this check, which must be enabled. Repeatable.
   --list              Print the names of all checks and stop.
-  --help              Show this message.
+  --help, -h          Show this message.
 
 Exit status: ${String(EXIT_CODES.clean)} when nothing is found, ${String(EXIT_CODES.violations)} when a check finds a violation, ${String(EXIT_CODES.failed)} when the checks could not run.
 `;
@@ -49,7 +49,7 @@ function requestedChecks(names: readonly string[]): readonly CheckName[] {
 async function runCheck(args: readonly string[], output: CommandOutput): Promise<number> {
   const { values } = parseArgs({
     args: [...args],
-    options: { cwd: { type: 'string' }, check: { type: 'string', multiple: true }, list: { type: 'boolean' }, help: { type: 'boolean' } },
+    options: { cwd: { type: 'string' }, check: { type: 'string', multiple: true }, list: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } },
     allowPositionals: false,
   });
   if (values.help === true) {
@@ -57,6 +57,7 @@ async function runCheck(args: readonly string[], output: CommandOutput): Promise
 
     return EXIT_CODES.clean;
   }
+  const requested = values.check === undefined ? undefined : requestedChecks(values.check);
   if (values.list === true) {
     for (const name of checkNames) {
       output.stdout(`${name}\t${registry[name].description}\n`);
@@ -65,7 +66,7 @@ async function runCheck(args: readonly string[], output: CommandOutput): Promise
     return EXIT_CODES.clean;
   }
   const cwd = resolve(values.cwd ?? process.cwd());
-  const result = await runChecks({ cwd, ...(values.check === undefined ? {} : { checks: requestedChecks(values.check) }) });
+  const result = await runChecks({ cwd, ...(requested === undefined ? {} : { checks: requested }) });
   for (const violation of result.violations) {
     output.stderr(formatViolation(violation));
   }
@@ -85,7 +86,7 @@ export async function runCommand(args: readonly string[], output: CommandOutput)
     if (command === 'check') {
       return await runCheck(rest, output);
     }
-    if (command === '--help') {
+    if (command === '--help' || command === '-h' || command === 'help') {
       output.stdout(USAGE);
 
       return EXIT_CODES.clean;

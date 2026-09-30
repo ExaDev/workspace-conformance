@@ -91,6 +91,13 @@ describe('check', () => {
 });
 
 describe('check --list', () => {
+  it('still rejects a check that does not exist', async () => {
+    const result = await run('check', '--list', '--check', 'nope');
+
+    expect(result.code).toBe(EXIT_CODES.failed);
+    expect(result.stderr).toContain("unknown check 'nope'");
+  });
+
   it('prints every check with its description and needs no configuration', async () => {
     const result = await run('check', '--list', '--cwd', fixturePath('storybook', 'clean'));
 
@@ -100,8 +107,8 @@ describe('check --list', () => {
 });
 
 describe('the command', () => {
-  it('prints usage for --help and for check --help, and exits 0', async () => {
-    for (const args of [['--help'], ['check', '--help']]) {
+  it('prints usage for --help, -h and help and for check --help and check -h, and exits 0', async () => {
+    for (const args of [['--help'], ['-h'], ['help'], ['check', '--help'], ['check', '-h']]) {
       const result = await run(...args);
 
       expect(result.code).toBe(EXIT_CODES.clean);
