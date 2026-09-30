@@ -53,6 +53,40 @@ describe('instruction-symlinks', () => {
     ]);
   });
 
+  it('accepts a link written another way that resolves to the README, and a chain of links that ends there', async () => {
+    const cwd = await createGitWorkspace({
+      'README.md': '# x\n',
+      'AGENTS.md': { symlink: './README.md' },
+      'CLAUDE.md': { symlink: 'AGENTS.md' },
+      'pkgs/a/README.md': '# a\n',
+      'pkgs/a/AGENTS.md': { symlink: '../a/./README.md' },
+      'pkgs/a/CLAUDE.md': { symlink: './AGENTS.md' },
+    });
+
+    expect(await instructionSymlinks({ cwd, options: { directories: ['.', 'pkgs/a'] } })).toEqual([]);
+  });
+
+  it('reports a chain of links that never reaches the README, and one that loops', async () => {
+    const cwd = await createGitWorkspace({
+      'README.md': '# x\n',
+      'OTHER.md': '# y\n',
+      'AGENTS.md': { symlink: 'CLAUDE.md' },
+      'CLAUDE.md': { symlink: 'AGENTS.md' },
+      'pkgs/a/README.md': '# a\n',
+      'pkgs/a/AGENTS.md': { symlink: '../../OTHER.md' },
+      'pkgs/a/CLAUDE.md': { symlink: '/etc/hosts' },
+    });
+
+    const violations = await instructionSymlinks({ cwd, options: { directories: ['.', 'pkgs/a'] } });
+
+    expect(violations.map((violation) => [violation.code, violation.file])).toEqual([
+      ['instruction-symlinks/wrong-target', 'AGENTS.md'],
+      ['instruction-symlinks/wrong-target', 'CLAUDE.md'],
+      ['instruction-symlinks/wrong-target', 'pkgs/a/AGENTS.md'],
+      ['instruction-symlinks/wrong-target', 'pkgs/a/CLAUDE.md'],
+    ]);
+  });
+
   it('reports a link to a README that is not tracked', async () => {
     const cwd = await createGitWorkspace({ 'AGENTS.md': { indexedSymlink: 'README.md' }, 'CLAUDE.md': { indexedSymlink: 'README.md' } });
 
