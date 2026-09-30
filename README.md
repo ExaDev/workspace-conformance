@@ -7,10 +7,10 @@ It complements the workspace architecture rules of [`@exadev/eslint-config`](htt
 ## Getting started
 
 ```sh
-pnpm add -D workspace-conformance @exadev/config cosmiconfig typescript
+pnpm add -D workspace-conformance @exadev/config cosmiconfig 'typescript@^6'
 ```
 
-`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`^5.9.0 || ^6.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7; ts-morph bundles its own compiler and does not use yours. The package supports Node 20 and later.
+`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`^5.9.0 || ^6.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7 (the range is in the install command because an unpinned `typescript` installs a newer major, which pnpm only warns about); the import checks fail with a configuration error when dependency-cruiser cannot load it. ts-morph bundles its own compiler and does not use yours. The package supports Node 20 and later.
 
 Configure the checks in `exadev.config.ts`:
 
@@ -89,7 +89,7 @@ How an import is attributed to a package, and the limits of that:
 - `import-cycles` follows files, so it cannot follow an import that resolves to no file. It treats packages that import each other by such names as a cycle between the packages, and finds it only when every import in the ring is of that kind; a ring that mixes such imports with imports that resolve to files is not seen until the workspace is installed and built.
 - Type-only imports and dynamic `import()` count, because a type dependency is still a dependency.
 - Test and tooling files inside a package are part of the package. Use `exclude` for paths that may cross layers.
-- dependency-cruiser supports TypeScript below 7.
+- dependency-cruiser supports TypeScript below 7. With a TypeScript it cannot load, or none, every import check fails with a configuration error and exit status 2 instead of reporting a clean workspace.
 
 | Check | Verifies |
 |---|---|
