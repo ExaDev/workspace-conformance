@@ -24,10 +24,10 @@ export async function createGitWorkspace(entries: Readonly<Record<string, GitEnt
     await mkdir(dirname(join(directory, name)), { recursive: true });
     if (typeof entry === 'string') {
       await writeFile(join(directory, name), entry);
-      git(directory, ['add', '--', name]);
+      git(directory, ['add', '--force', '--', name]);
     } else if ('symlink' in entry) {
       await symlink(entry.symlink, join(directory, name));
-      git(directory, ['add', '--', name]);
+      git(directory, ['add', '--force', '--', name]);
     } else {
       await writeFile(join(directory, name), entry.indexedSymlink);
       const blob = git(directory, ['hash-object', '-w', '--stdin'], entry.indexedSymlink).trim();
