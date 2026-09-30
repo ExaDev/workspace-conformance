@@ -164,7 +164,7 @@ const result = await runChecks({ cwd: process.cwd() });
 // result.violations: all of them; result.exitCode: 0 or 1
 ```
 
-`runChecks` loads both sections from `cwd` unless you pass `config` (the `conformance` section) or `layout`, and takes `checks` to run a subset and `configFiles` (`alias`, `fsCache`, `trust`, `merge`) for how config files load. Violations never throw. It throws `ConformanceError` when the checks cannot run and `ConfigValidationError` (from `@exadev/config`) when a section is invalid. Use it in a vitest test so the conformance suite runs with the rest:
+`runChecks` loads both sections from `cwd` unless you pass `config` (the `conformance` section) or `layout`, which are validated with the same schemas as the ones it loads, and takes `checks` to run a subset and `configFiles` (`alias`, `fsCache`, `trust`, `merge`) for how config files load. Violations never throw. It throws `ConformanceError` when the checks cannot run and `ConfigValidationError` (from `@exadev/config`) when a section is invalid. Use it in a vitest test so the conformance suite runs with the rest:
 
 ```ts
 import { runChecks } from 'workspace-conformance';
@@ -177,7 +177,7 @@ it('conforms to the workspace layout', async () => {
 });
 ```
 
-Every check is also exported as a function taking `{ cwd, options }` (and `layout` for the import checks): `aggregateMappers`, `commandTypes`, `importUphill`, `importRankSkip`, `importCrossSlice`, `importIsolatedGroups`, `importCycles`, `instructionSymlinks`, `singleStorybook`, `commitTypes` and `dockerfilePackageManager`. A check is a function that returns `Promise<readonly Violation[]>`, where a `Violation` is `{ code, message, file, location? }`.
+Every check is also exported as a function taking `{ cwd, options }` (and `layout` for the import checks): `aggregateMappers`, `commandTypes`, `importUphill`, `importRankSkip`, `importCrossSlice`, `importIsolatedGroups`, `importCycles`, `instructionSymlinks`, `singleStorybook`, `commitTypes` and `dockerfilePackageManager`. These take options and a layout as already validated and do not check them again; go through `runChecks` for validation. A check is a function that returns `Promise<readonly Violation[]>`, where a `Violation` is `{ code, message, file, location? }`.
 
 ### Proving a handler map is exhaustive
 
