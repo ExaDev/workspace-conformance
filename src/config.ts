@@ -37,7 +37,20 @@ const patterns = z.array(pattern);
 
 const importGraph = z.strictObject({ exclude: z.exactOptional(patterns), doNotFollow: z.exactOptional(patterns), tsConfig: z.exactOptional(path) });
 
-const enabled = <Options extends z.ZodType>(options: Options): z.ZodUnion<[z.ZodLiteral<false>, Options]> => z.union([z.literal(false), options]);
+/**
+ * A check's setting: `false`, or its options. A union reports only "Invalid input" for a setting that is wrong, so the issues of the options branch, which is the one the person meant unless they wrote `false`, are put in the message.
+ */
+const enabled = <Options extends z.ZodType>(options: Options): z.ZodUnion<[z.ZodLiteral<false>, Options]> =>
+  z.union([z.literal(false), options], {
+    error: (issue) => {
+      const [, optionsIssues] = issue.errors;
+      if (optionsIssues === undefined) {
+        return undefined;
+      }
+
+      return `expected false or an options object: ${optionsIssues.map((found) => (found.path.length === 0 ? found.message : `${found.path.map(String).join('.')}: ${found.message}`)).join('; ')}`;
+    },
+  });
 
 const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
   'aggregate-mappers': z.exactOptional(

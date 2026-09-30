@@ -70,4 +70,11 @@ describe('conformanceSchema', () => {
 
     expect(issues).toEqual(['checks.import-uphill.exclude.1: not a valid regular expression', 'checks.import-uphill.doNotFollow.0: not a valid regular expression']);
   });
+
+  it('says what is wrong with the options of a check whose setting is neither false nor valid options', async () => {
+    expect(await issuesOf({ checks: { 'import-uphill': { tsConfig: 12345, bogus: 'x' } } })).toEqual([
+      'checks.import-uphill: expected false or an options object: tsConfig: Invalid input: expected string, received number; Unrecognized key: "bogus"',
+    ]);
+    expect(await issuesOf({ checks: { 'single-storybook': 'x' } })).toEqual(['checks.single-storybook: expected false or an options object: Invalid input: expected object, received string']);
+  });
 });
