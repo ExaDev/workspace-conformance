@@ -19,7 +19,23 @@ const path = z.string().min(1);
 const paths = z.array(path).min(1);
 const names = z.array(z.string().min(1));
 
-const importGraph = z.strictObject({ exclude: z.exactOptional(names), doNotFollow: z.exactOptional(names), tsConfig: z.exactOptional(path) });
+function compiles(source: string): boolean {
+  try {
+    new RegExp(source);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Source text of a regular expression that dependency-cruiser compiles as written. It is checked here because dependency-cruiser reports one that does not compile as a slow pattern and quotes it.
+ */
+const pattern = z.string().min(1).refine(compiles, 'not a valid regular expression');
+const patterns = z.array(pattern);
+
+const importGraph = z.strictObject({ exclude: z.exactOptional(patterns), doNotFollow: z.exactOptional(patterns), tsConfig: z.exactOptional(path) });
 
 const enabled = <Options extends z.ZodType>(options: Options): z.ZodUnion<[z.ZodLiteral<false>, Options]> => z.union([z.literal(false), options]);
 

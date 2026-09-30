@@ -64,4 +64,10 @@ describe('conformanceSchema', () => {
   it('rejects an option written as undefined, as the type does under exactOptionalPropertyTypes', async () => {
     expect(await issuesOf({ checks: { 'single-storybook': { location: undefined } } })).toBeDefined();
   });
+
+  it('rejects a regular expression that does not compile, at its position and without quoting it', async () => {
+    const issues = await issuesOf({ checks: { 'import-uphill': { exclude: ['^ok/', '(SECRETREGEX13'], doNotFollow: ['[SECRETREGEX14'] } } });
+
+    expect(issues).toEqual(['checks.import-uphill.exclude.1: not a valid regular expression', 'checks.import-uphill.doNotFollow.0: not a valid regular expression']);
+  });
 });
