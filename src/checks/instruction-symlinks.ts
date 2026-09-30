@@ -4,7 +4,7 @@ import { isDynamicPattern } from 'tinyglobby';
 
 import type { CheckFunction, Violation } from '../check';
 import { findDirectories } from '../files';
-import { blobContent, GIT_SYMLINK_MODE, indexEntry } from '../git';
+import { blobContent, GIT_SYMLINK_MODE, type IndexEntry, indexEntry } from '../git';
 import type { InstructionSymlinksOptions } from '../options';
 
 /**
@@ -24,7 +24,31 @@ async function directoriesOf(cwd: string, patterns: readonly string[]): Promise<
 }
 
 /**
- * Each agent instruction file is tracked by git as a symbolic link (mode 120000) whose target is the README beside it, so the two cannot diverge. It reads the index, not the working tree, so a checkout with `core.symlinks` false, where a link is written out as a plain file, is judged by what is committed.
+ * Whether the tracked symbolic link `file` (with index entry `entry`) leads to `destination`: its target, resolved against the directory of the link, is `destination`, or is another tracked symbolic link that leads there. A link back to a link already followed leads nowhere.
+ */
+async function leadsTo(cwd: string, file: string, entry: IndexEntry, destination: string): Promise<boolean> {
+  const followed = new Set<string>();
+  let current = { file, entry };
+  for (;;) {
+    const linked = (await blobContent(cwd, current.entry.blob)).trim();
+    if (posix.isAbsolute(linked)) {
+      return false;
+    }
+    const resolved = posix.join(posix.dirname(current.file), linked);
+    if (resolved === destination) {
+      return true;
+    }
+    const next = followed.has(resolved) ? undefined : await indexEntry(cwd, resolved);
+    if (next?.mode !== GIT_SYMLINK_MODE) {
+      return false;
+    }
+    followed.add(resolved);
+    current = { file: resolved, entry: next };
+  }
+}
+
+/**
+ * Each agent instruction file is tracked by git as a symbolic link (mode 120000) whose target is the README beside it, so the two cannot diverge. The link may be written in any form that resolves there (`./README.md`), and may lead through other tracked links, as in `CLAUDE.md` to `AGENTS.md` to `README.md`. It reads the index, not the working tree, so a checkout with `core.symlinks` false, where a link is written out as a plain file, is judged by what is committed.
  */
 export const instructionSymlinks: CheckFunction<InstructionSymlinksOptions> = async ({ cwd, options }) => {
   const files = options.files ?? DEFAULT_INSTRUCTION_FILES;
@@ -41,8 +65,8 @@ export const instructionSymlinks: CheckFunction<InstructionSymlinksOptions> = as
       } else if (entry.mode !== GIT_SYMLINK_MODE) {
         violations.push({ code: 'instruction-symlinks/not-a-symlink', message: `${file} is committed as a regular file (mode ${entry.mode}); commit it as a symbolic link to ${target}`, file });
       } else {
-        const linked = (await blobContent(cwd, entry.blob)).trim();
-        if (linked !== target) {
+        if (!(await leadsTo(cwd, file, entry, readme))) {
+          const linked = (await blobContent(cwd, entry.blob)).trim();
           violations.push({ code: 'instruction-symlinks/wrong-target', message: `${file} links to ${linked}; it should link to ${target}`, file });
         } else if ((await indexEntry(cwd, readme)) === undefined) {
           violations.push({ code: 'instruction-symlinks/dangling', message: `${file} links to ${target}, which is not tracked`, file });
