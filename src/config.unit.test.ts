@@ -22,7 +22,7 @@ describe('conformanceSchema', () => {
         'aggregate-mappers': { contracts: ['a.ts'], mapper: '{dir}/{name}.ts', adapters: '{dir}/*', exclude: ['X'], tsConfig: 'tsconfig.json' },
         'command-types': { commands: ['c.ts'], exclude: ['Command'], inferences: ['infer'], tsConfig: 'tsconfig.json' },
         'import-uphill': {},
-        'import-rank-skip': { exclude: ['^x/'], tsConfig: 'tsconfig.json' },
+        'import-rank-skip': { exclude: ['^x/'], doNotFollow: ['^y/'], tsConfig: 'tsconfig.json' },
         'import-cross-slice': false,
         'instruction-symlinks': { files: ['AGENTS.md'], directories: ['.'], target: 'README.md' },
         'single-storybook': { location: '.' },

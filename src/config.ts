@@ -19,7 +19,7 @@ const path = z.string().min(1);
 const paths = z.array(path).min(1);
 const names = z.array(z.string().min(1));
 
-const importGraph = z.strictObject({ exclude: z.exactOptional(names), tsConfig: z.exactOptional(path) });
+const importGraph = z.strictObject({ exclude: z.exactOptional(names), doNotFollow: z.exactOptional(names), tsConfig: z.exactOptional(path) });
 
 const enabled = <Options extends z.ZodType>(options: Options): z.ZodUnion<[z.ZodLiteral<false>, Options]> => z.union([z.literal(false), options]);
 

@@ -10,7 +10,7 @@ export interface ImportRule {
   readonly severity: 'error';
   readonly comment: string;
   readonly from: { readonly path?: string };
-  readonly to: { readonly path?: string; readonly circular?: boolean };
+  readonly to: { readonly path?: string; readonly circular?: boolean; readonly couldNotResolve?: boolean };
 }
 
 const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/gu;
@@ -24,6 +24,36 @@ function escapeRegExp(text: string): string {
  */
 export function packagesPattern(packages: readonly WorkspacePackage[]): string {
   return `^(${packages.map((member) => `${escapeRegExp(member.dir)}/`).join('|')})`;
+}
+
+/**
+ * A regular expression, as source text, matching the name an import uses for any of the named packages: the name itself or a subpath of it. It matches nothing but those names, and is `undefined` when no package has a name.
+ */
+export function packageNamesPattern(packages: readonly WorkspacePackage[]): string | undefined {
+  const names = packages.flatMap((member) => (member.name === undefined ? [] : [escapeRegExp(member.name)]));
+
+  return names.length === 0 ? undefined : `^(${names.join('|')})(/|$)`;
+}
+
+/**
+ * The paths a graph of these packages is limited to: their files, and the names other packages import them by. An import that dependency-cruiser cannot resolve to a file (a package whose entry point is not built, or a workspace that is not installed) is known to it only by that name.
+ */
+export function graphScopePattern(packages: readonly WorkspacePackage[]): string {
+  const names = packageNamesPattern(packages);
+
+  return names === undefined ? packagesPattern(packages) : `${packagesPattern(packages)}|${names}`;
+}
+
+/**
+ * The rules that forbid files of `from` to import `to`: one for the files the packages resolve to and, when any of them has a name, one for an import of the name that cannot be resolved to a file. Both are named after `name`, which is also each rule's comment prefix.
+ */
+function forbid(name: string, comment: string, from: readonly WorkspacePackage[], to: readonly WorkspacePackage[]): readonly ImportRule[] {
+  const names = packageNamesPattern(to);
+  const byPath: ImportRule = { name, severity: 'error', comment, from: { path: packagesPattern(from) }, to: { path: packagesPattern(to) } };
+
+  return names === undefined
+    ? [byPath]
+    : [byPath, { name: `${name}-by-name`, severity: 'error', comment, from: { path: packagesPattern(from) }, to: { path: names, couldNotResolve: true } }];
 }
 
 function groupBy<Key>(packages: readonly WorkspacePackage[], keyOf: (member: WorkspacePackage) => Key | undefined): ReadonlyMap<Key, readonly WorkspacePackage[]> {
@@ -59,26 +89,16 @@ export function ranked(packages: readonly WorkspacePackage[]): readonly (Workspa
 }
 
 /**
- * One rule per rank that has a higher rank above it: files of a package at that rank may not import a package at a strictly higher rank. A rule compares no numbers, so the ordering is expanded into path alternations here.
+ * One rule per rank that has a higher rank above it: files of a package at that rank may not import a package at a strictly higher rank. A rule compares no numbers, so the ordering is expanded into path alternations here. Each rule comes with a `-by-name` rule for imports that do not resolve to a file.
  */
 export function uphillRules(packages: readonly WorkspacePackage[]): readonly ImportRule[] {
   const members = ranked(packages);
   const byRank = groupBy(members, (member) => member.rank);
 
-  return [...byRank.entries()].sort(([a], [b]) => a - b).flatMap(([rank, own]): ImportRule[] => {
+  return [...byRank.entries()].sort(([a], [b]) => a - b).flatMap(([rank, own]): readonly ImportRule[] => {
     const higher = members.filter((member) => member.rank > rank);
 
-    return higher.length === 0
-      ? []
-      : [
-          {
-            name: `uphill-rank-${String(rank)}`,
-            severity: 'error',
-            comment: `a package of rank ${String(rank)} may not import a package of a higher rank`,
-            from: { path: packagesPattern(own) },
-            to: { path: packagesPattern(higher) },
-          },
-        ];
+    return higher.length === 0 ? [] : forbid(`uphill-rank-${String(rank)}`, `a package of rank ${String(rank)} may not import a package of a higher rank`, own, higher);
   });
 }
 
@@ -89,20 +109,17 @@ export function rankSkipRules(packages: readonly WorkspacePackage[], rankSkip: R
   const members = ranked(packages);
   const byRank = groupBy(members, (member) => member.rank);
 
-  return [...byRank.entries()].sort(([a], [b]) => a - b).flatMap(([rank, own]): ImportRule[] => {
+  return [...byRank.entries()].sort(([a], [b]) => a - b).flatMap(([rank, own]): readonly ImportRule[] => {
     const skipped = members.filter((member) => member.rank < rank - rankSkip.maxDistance && !rankSkip.exemptRanks.includes(member.rank));
 
     return skipped.length === 0
       ? []
-      : [
-          {
-            name: `rank-skip-${String(rank)}`,
-            severity: 'error',
-            comment: `a package of rank ${String(rank)} may import at most ${String(rankSkip.maxDistance)} rank(s) below it, apart from the exempt ranks`,
-            from: { path: packagesPattern(own) },
-            to: { path: packagesPattern(skipped) },
-          },
-        ];
+      : forbid(
+          `rank-skip-${String(rank)}`,
+          `a package of rank ${String(rank)} may import at most ${String(rankSkip.maxDistance)} rank(s) below it, apart from the exempt ranks`,
+          own,
+          skipped,
+        );
   });
 }
 
@@ -112,20 +129,10 @@ export function rankSkipRules(packages: readonly WorkspacePackage[], rankSkip: R
 export function crossSliceRules(packages: readonly WorkspacePackage[]): readonly ImportRule[] {
   const bySlice = groupBy(packages, (member) => member.slice);
 
-  return [...bySlice.entries()].sort(([a], [b]) => a.localeCompare(b)).flatMap(([slice, own]): ImportRule[] => {
+  return [...bySlice.entries()].sort(([a], [b]) => a.localeCompare(b)).flatMap(([slice, own]): readonly ImportRule[] => {
     const others = packages.filter((member) => member.slice !== undefined && member.slice !== slice);
 
-    return others.length === 0
-      ? []
-      : [
-          {
-            name: `cross-slice-${slice}`,
-            severity: 'error',
-            comment: `a package in the '${slice}' slice may not import a package in another slice`,
-            from: { path: packagesPattern(own) },
-            to: { path: packagesPattern(others) },
-          },
-        ];
+    return others.length === 0 ? [] : forbid(`cross-slice-${slice}`, `a package in the '${slice}' slice may not import a package in another slice`, own, others);
   });
 }
 
@@ -139,21 +146,11 @@ export function isolatedGroupRules(packages: readonly WorkspacePackage[], isolat
     [
       { from: first, to: second },
       { from: second, to: first },
-    ].flatMap(({ from, to }): ImportRule[] => {
+    ].flatMap(({ from, to }): readonly ImportRule[] => {
       const own = byGroup.get(from);
       const other = byGroup.get(to);
 
-      return own === undefined || other === undefined
-        ? []
-        : [
-            {
-              name: `isolated-${from}-${to}`,
-              severity: 'error',
-              comment: `the '${from}' group may not import the '${to}' group`,
-              from: { path: packagesPattern(own) },
-              to: { path: packagesPattern(other) },
-            },
-          ];
+      return own === undefined || other === undefined ? [] : forbid(`isolated-${from}-${to}`, `the '${from}' group may not import the '${to}' group`, own, other);
     }),
   );
 }

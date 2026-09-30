@@ -51,9 +51,13 @@ export interface CommandTypesOptions {
  */
 export interface ImportGraphOptions {
   /**
-   * Regular expressions, as source text, for paths relative to the workspace root that are left out of the graph. Anything matching one is neither a dependant nor a dependency. Installed dependencies and `dist` directories when omitted.
+   * Regular expressions, as source text, for paths relative to the workspace root that are left out of the graph. Anything matching one is neither a dependant nor a dependency. Installed dependencies (`node_modules`) when omitted.
    */
   readonly exclude?: readonly string[];
+  /**
+   * Regular expressions, as source text, for paths relative to the workspace root whose files can be imported but whose own imports are not followed, so build output is a target of imports and never a dependant. `dist` directories when omitted.
+   */
+  readonly doNotFollow?: readonly string[];
   /**
    * A tsconfig, relative to the directory the checks run in, for path aliases and other module resolution the imports depend on.
    */

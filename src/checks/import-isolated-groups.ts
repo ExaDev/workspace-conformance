@@ -2,7 +2,7 @@ import type { LayoutCheckFunction } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { isolatedGroupRules } from '../workspace/rules';
-import { describePackage, runImportCheck } from './import-graph';
+import { describePackage, describeTarget, runImportCheck } from './import-graph';
 
 /**
  * A package imports a package in a group the layout isolates from its own.
@@ -18,6 +18,6 @@ export const importIsolatedGroups: LayoutCheckFunction<ImportGraphOptions> = asy
 
       return isolatedGroupRules(packages, context.layout.isolatedGroups);
     },
-    message: ({ from, to, toFile }) =>
-      `${describePackage(from)} (group '${from.group}') imports ${toFile} in ${describePackage(to)} (group '${to.group}'), which the layout isolates from it`,
+    message: (edge) =>
+      `${describePackage(edge.from)} (group '${edge.from.group}') imports ${describeTarget(edge)} (group '${edge.to.group}'), which the layout isolates from it`,
   });

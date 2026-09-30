@@ -8,12 +8,17 @@ import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { relativePosix } from '../paths';
 import { type WorkspacePackage, readWorkspacePackages, workspaceRoot } from '../workspace/packages';
-import { type ImportRule, packagesPattern } from '../workspace/rules';
+import { graphScopePattern, type ImportRule } from '../workspace/rules';
 
 /**
- * Paths left out of the import graph unless the options say otherwise: a package's own installed dependencies, and build output, which repeats the sources it was built from.
+ * Paths left out of the import graph unless the options say otherwise: a package's own installed dependencies.
  */
-export const DEFAULT_GRAPH_EXCLUDES: readonly string[] = ['(^|/)node_modules/', '(^|/)dist/'];
+export const DEFAULT_GRAPH_EXCLUDES: readonly string[] = ['(^|/)node_modules/'];
+
+/**
+ * Paths whose files are imported but whose own imports are not followed unless the options say otherwise: build output, which repeats the sources it was built from. A package that exports its build output is imported through it, so the output has to stay in the graph as a target.
+ */
+export const DEFAULT_DO_NOT_FOLLOW: readonly string[] = ['(^|/)dist/'];
 
 /**
  * One import that broke a rule, both ends resolved to the package they are in.
@@ -41,10 +46,13 @@ export interface ImportCheckSpec {
   readonly message: (edge: ImportEdge) => string;
 }
 
-function packageOfFile(packages: readonly WorkspacePackage[], file: string): WorkspacePackage {
-  const found = packages.find((member) => file.startsWith(`${member.dir}/`));
+/**
+ * The package a path in the graph belongs to: the one whose directory holds the file, or the one whose name the path is (an import that resolved to no file is known only by the name it was written with, or a subpath of it). It throws `ConformanceError` for a path the graph should not contain.
+ */
+function packageOfPath(packages: readonly WorkspacePackage[], path: string): WorkspacePackage {
+  const found = packages.find((member) => path.startsWith(`${member.dir}/`) || (member.name !== undefined && (path === member.name || path.startsWith(`${member.name}/`))));
   if (found === undefined) {
-    throw new ConformanceError(`${file} is in no workspace package, although the graph is limited to the packages' files`);
+    throw new ConformanceError(`${path} is in no workspace package, although the graph is limited to the packages' files and names`);
   }
 
   return found;
@@ -77,7 +85,8 @@ export async function cruiseViolations(input: {
     {
       baseDir: await realpath(root),
       exclude: { path: [...(options.exclude ?? DEFAULT_GRAPH_EXCLUDES)] },
-      includeOnly: { path: packagesPattern(packages) },
+      doNotFollow: { path: [...(options.doNotFollow ?? DEFAULT_DO_NOT_FOLLOW)] },
+      includeOnly: { path: graphScopePattern(packages) },
       ruleSet: { forbidden: [...rules] },
       tsPreCompilationDeps: true,
       validate: true,
@@ -104,8 +113,8 @@ export async function runImportCheck(context: LayoutCheckContext<ImportGraphOpti
 
   return found
     .map((finding): Violation => {
-      const from = packageOfFile(packages, finding.from);
-      const to = packageOfFile(packages, finding.to);
+      const from = packageOfPath(packages, finding.from);
+      const to = packageOfPath(packages, finding.to);
 
       return {
         code: `${spec.name}/${spec.reason}`,
@@ -121,4 +130,14 @@ export async function runImportCheck(context: LayoutCheckContext<ImportGraphOpti
  */
 export function describePackage(member: WorkspacePackage): string {
   return member.name ?? member.dir;
+}
+
+/**
+ * How an import's target is named in a message: the file and the package it is in, or just the name when the import resolved to no file and is known only by the name it was written with.
+ */
+export function describeTarget(edge: ImportEdge): string {
+  const { to, toFile } = edge;
+  const byName = to.name !== undefined && (toFile === to.name || toFile.startsWith(`${to.name}/`));
+
+  return byName ? toFile : `${toFile} in ${describePackage(to)}`;
 }
