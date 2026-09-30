@@ -78,8 +78,8 @@ All import checks take these options:
 
 | Option | Meaning |
 |---|---|
-| `exclude` | Regular expressions, as source text, for paths relative to the workspace root that are left out of the graph: neither a dependant nor a dependency. `node_modules` directories when omitted. Setting it replaces that default. |
-| `doNotFollow` | Regular expressions for paths whose files can be imported but whose own imports are not followed, so build output is a target of imports and never a dependant. `dist` directories when omitted. Setting it replaces that default. |
+| `exclude` | Regular expressions, as source text, for paths relative to the workspace root that are left out of the graph: neither a dependant nor a dependency. `node_modules` directories when omitted. Setting it replaces that default. A pattern that does not compile fails when the section loads. |
+| `doNotFollow` | Regular expressions for paths whose files can be imported but whose own imports are not followed, so build output is a target of imports and never a dependant. `dist` directories when omitted. Setting it replaces that default. A pattern that does not compile fails when the section loads. |
 | `tsConfig` | A tsconfig for path aliases and other module resolution. |
 
 How an import is attributed to a package, and the limits of that:
