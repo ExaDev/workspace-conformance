@@ -79,7 +79,7 @@ function isCustom(type: string): boolean {
 }
 
 /**
- * The commit types commitlint accepts are accounted for in the release config. A type no preset knows must have a release rule and, when the config lists changelog sections, a section, or it can be committed and never released or shown; a release rule or changelog section for a type commitlint rejects can never apply. A preset type may be left out of either list: leaving out a type that does not release is how a release rule list is normally written.
+ * The commit types commitlint accepts are accounted for in the release config. A type no preset knows must have a release rule and, when the config lists changelog sections (`presetConfig.types` of the release notes generator), a section, or it can be committed and never released or shown; a release rule or changelog section for a type commitlint rejects can never apply. A preset type may be left out of either list: leaving out a type that does not release is how a release rule list is normally written.
  *
  * It compares only what is written. The check has nothing to say when the commit types are the preset's and every listed type is one of them. A commitlint config that does not set `type-enum` while the release config lists a type no preset knows is a violation, since the commit types cannot then be read. Both configs are evaluated, so a list may be derived from one shared constant.
  */
@@ -117,11 +117,11 @@ export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, opti
   }
 
   const lists = [
-    { listed: releaseRules, noun: 'release rule', absent: 'no-release-rule', extra: 'release-rule-not-a-commit-type' },
-    { listed: changelog, noun: 'changelog section', absent: 'no-changelog-section', extra: 'changelog-section-not-a-commit-type' },
+    { listed: releaseRules, required: true, noun: 'release rule', absent: 'no-release-rule', extra: 'release-rule-not-a-commit-type' },
+    { listed: changelog, required: changelog !== undefined, noun: 'changelog section', absent: 'no-changelog-section', extra: 'changelog-section-not-a-commit-type' },
   ];
-  for (const { listed, noun, absent, extra } of lists) {
-    for (const type of accepted.filter(isCustom)) {
+  for (const { listed, required, noun, absent, extra } of lists) {
+    for (const type of required ? accepted.filter(isCustom) : []) {
       if (listed?.includes(type) !== true) {
         violations.push({
           code: `commit-types/${absent}`,
