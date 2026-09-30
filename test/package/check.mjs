@@ -1,9 +1,11 @@
 // Runs in a scratch project that has the packed tarball installed. It runs the checks through the installed package as an ES module and through its command line.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { EXIT_CODES, checkNames, proveExhaustive, runChecks } from 'workspace-conformance';
+import { EXIT_CODES, PRESET_COMMIT_TYPES, checkNames, proveExhaustive, runChecks } from 'workspace-conformance';
 
 const cwd = process.cwd();
+
+assert.ok(PRESET_COMMIT_TYPES.includes('feat'));
 
 const result = await runChecks({ cwd });
 assert.deepEqual(
