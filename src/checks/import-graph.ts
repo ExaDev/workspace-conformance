@@ -1,7 +1,7 @@
+import { realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-import { cruise, type IViolation } from 'dependency-cruiser';
-import extractTsConfig from 'dependency-cruiser/config-utl/extract-ts-config';
+import type { IViolation } from 'dependency-cruiser';
 
 import type { LayoutCheckContext, Violation } from '../check';
 import { ConformanceError } from '../errors';
@@ -53,6 +53,8 @@ function packageOfFile(packages: readonly WorkspacePackage[], file: string): Wor
 /**
  * The violations of `rules` among the files of `packages`. The graph is limited to the packages' own files, so nothing outside them is a dependant or a dependency.
  *
+ * The base directory is the real path of the root: dependency-cruiser resolves symbolic links, so the path of a file behind one would otherwise not be relative to it.
+ *
  * The result is read from the cruise summary: `cruise()` reports success in its exit code whatever the summary holds, so the code is not consulted.
  */
 export async function cruiseViolations(input: {
@@ -67,10 +69,13 @@ export async function cruiseViolations(input: {
     return [];
   }
   const tsConfigFile = options.tsConfig === undefined ? undefined : resolve(cwd, options.tsConfig);
+  // dependency-cruiser is an ES module only, so it is imported dynamically: a static import would make the CommonJS build of this package fail to load.
+  const { cruise } = await import('dependency-cruiser');
+  const { default: extractTsConfig } = await import('dependency-cruiser/config-utl/extract-ts-config');
   const result = await cruise(
     packages.map((member) => member.dir),
     {
-      baseDir: root,
+      baseDir: await realpath(root),
       exclude: { path: [...(options.exclude ?? DEFAULT_GRAPH_EXCLUDES)] },
       includeOnly: { path: packagesPattern(packages) },
       ruleSet: { forbidden: [...rules] },
