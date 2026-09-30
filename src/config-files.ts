@@ -19,5 +19,6 @@ export async function evaluateConfigFile(cwd: string, file: string): Promise<unk
     return undefined;
   }
 
-  return createJitiLoader().importer.importDefault(absolute);
+  // No on-disk transpile cache: a check reads the workspace and leaves it as it found it.
+  return createJitiLoader({ fsCache: false }).importer.importDefault(absolute);
 }
