@@ -142,6 +142,28 @@ describe('single-storybook', () => {
     expect(violations.map((violation) => violation.file)).toEqual(['packages/ui/.storybook']);
   });
 
+  it('does not search a directory exclude names, with or without a trailing glob', async () => {
+    const withGlob = await singleStorybook({ cwd: fixturePath('storybook', 'violating'), options: { exclude: ['apps/**'] } });
+    const bare = await singleStorybook({ cwd: fixturePath('storybook', 'violating'), options: { exclude: ['apps'] } });
+
+    expect(bare).toEqual(withGlob);
+  });
+
+  it('does not search git data or another checkout below the directory, such as a linked worktree', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      '.storybook/main.ts': '',
+      '.git/modules/.storybook/HEAD': '',
+      '.claude/worktrees/x/.git': 'gitdir: ../../../.git/worktrees/x\n',
+      '.claude/worktrees/x/.storybook/main.ts': '',
+      'nested-clone/.git/HEAD': '',
+      'nested-clone/.storybook/main.ts': '',
+      'packages/ui/.storybook/main.ts': '',
+    });
+
+    expect((await singleStorybook({ cwd, options: {} })).map((violation) => violation.file)).toEqual(['packages/ui/.storybook']);
+  });
+
   it('permits the Storybook in the directory the options name instead of the root', async () => {
     const violations = await singleStorybook({ cwd: fixturePath('storybook', 'violating'), options: { location: 'packages/ui' } });
 
