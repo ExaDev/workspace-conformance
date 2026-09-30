@@ -1,4 +1,4 @@
-import type { LayoutConfig } from '@exadev/config';
+import type { ConfigFileOptions, LayoutConfig } from '@exadev/config';
 
 /**
  * A position in a file, both numbers counted from 1.
@@ -33,6 +33,10 @@ export interface CheckContext<Options> {
    */
   readonly cwd: string;
   readonly options: Options;
+  /**
+   * How config files that a check evaluates itself (the commitlint and release configs of `commit-types`) are loaded. Only `alias` and `fsCache` apply to evaluating a file; `trust` and `merge` are for `extends`. No transpile cache is written when omitted.
+   */
+  readonly configFiles?: ConfigFileOptions;
 }
 
 /**

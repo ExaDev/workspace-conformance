@@ -33,7 +33,7 @@ export interface RunChecksOptions {
    */
   readonly layout?: LayoutConfig;
   /**
-   * How config files are loaded, when a section is loaded from `cwd`.
+   * How config files are loaded: the sections loaded from `cwd` and the config files a check evaluates itself, such as the commitlint and release configs of `commit-types`. Only `alias` and `fsCache` apply to the latter.
    */
   readonly configFiles?: ConfigFileOptions;
 }
@@ -123,7 +123,7 @@ export async function runChecks(options: RunChecksOptions): Promise<RunResult> {
 
   const results: CheckResult[] = [];
   for (const name of names) {
-    results.push({ check: name, violations: await registry[name].run({ cwd: options.cwd, checks: config.checks, layout }) });
+    results.push({ check: name, violations: await registry[name].run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles }) });
   }
   const violations = results.flatMap((result) => result.violations);
 
