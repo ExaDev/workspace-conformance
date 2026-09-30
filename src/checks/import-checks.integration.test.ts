@@ -178,6 +178,75 @@ describe('imports of a package by name', () => {
   });
 });
 
+describe('import cycles', () => {
+  const layout = { groups: [{ name: 'core', rank: 0 }] };
+  const base = { 'pnpm-workspace.yaml': 'packages:\n  - core/*\n' };
+
+  it('finds packages that import each other by names that resolve to no file', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      ...base,
+      'core/a/package.json': '{ "name": "@w/a" }',
+      'core/a/src/index.ts': "import '@w/b';\n",
+      'core/b/package.json': '{ "name": "@w/b" }',
+      'core/b/src/index.ts': "import '@w/a';\n",
+    });
+
+    const violations = await importCycles({ cwd: workspace, layout, options: {} });
+
+    expect(summary(violations)).toEqual([['import-cycles/cycle', 'core/a/src/index.ts']]);
+    expect(violations[0]?.message).toBe('import cycle between packages that import each other by a name that resolves to no file: @w/a -> @w/b -> @w/a');
+  });
+
+  it('reports a cycle of three packages once, and ignores a package importing its own name', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      ...base,
+      'core/a/package.json': '{ "name": "@w/a" }',
+      'core/a/src/index.ts': "import '@w/b';\nimport '@w/a/other';\n",
+      'core/b/package.json': '{ "name": "@w/b" }',
+      'core/b/src/index.ts': "import '@w/c';\n",
+      'core/c/package.json': '{ "name": "@w/c" }',
+      'core/c/src/index.ts': "import '@w/a';\n",
+    });
+
+    const violations = await importCycles({ cwd: workspace, layout, options: {} });
+
+    expect(violations.map((violation) => violation.message)).toEqual(['import cycle between packages that import each other by a name that resolves to no file: @w/a -> @w/b -> @w/c -> @w/a']);
+  });
+
+  it('finds no cycle among packages that import one another in one direction by name', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      ...base,
+      'core/a/package.json': '{ "name": "@w/a" }',
+      'core/a/src/index.ts': "import '@w/b';\n",
+      'core/b/package.json': '{ "name": "@w/b" }',
+      'core/b/src/index.ts': 'export const b = 1;\n',
+    });
+
+    expect(await importCycles({ cwd: workspace, layout, options: {} })).toEqual([]);
+  });
+
+  it('reports each ring of files once, starting at its smallest file', async () => {
+    const workspace = await makeTempDir();
+    const imports: Readonly<Record<string, readonly string[]>> = { a: ['b', 'c'], b: ['c', 'd'], c: ['d', 'e'], d: ['e', 'a'], e: ['a', 'b'] };
+    await writeFiles(workspace, {
+      ...base,
+      'core/a/package.json': '{ "name": "@w/a" }',
+      ...Object.fromEntries(Object.entries(imports).map(([file, targets]) => [`core/a/src/${file}.ts`, targets.map((target) => `import './${target}';\n`).join('')])),
+    });
+
+    const rings = (await importCycles({ cwd: workspace, layout, options: {} })).map((violation) => violation.message.replace('import cycle: ', '').split(' -> ').slice(0, -1));
+
+    expect(rings.length).toBeGreaterThan(1);
+    expect(new Set(rings.map((ring) => ring.join(' '))).size).toBe(rings.length);
+    for (const ring of rings) {
+      expect(ring[0]).toBe(ring.toSorted()[0]);
+    }
+  });
+});
+
 describe('attributing a path to a package', () => {
   it('prefers the package whose directory holds a file over one whose name is the start of its path', async () => {
     const workspace = await makeTempDir();

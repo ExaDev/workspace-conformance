@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ConformanceError } from '../errors';
 import type { WorkspacePackage } from './packages';
-import { crossSliceRules, cycleRule, graphScopePattern, isolatedGroupRules, packageNamesPattern, packagesPattern, rankSkipRules, ranked, uphillRules } from './rules';
+import { crossSliceRules, cycleRule, graphScopePattern, isolatedGroupRules, packageNamesPattern, packagesPattern, rankSkipRules, ranked, unresolvedNameImportRule, uphillRules } from './rules';
 
 function member(dir: string, group: string, rank: number | undefined, slice?: string): WorkspacePackage {
   return { dir, name: undefined, group, rank, slice };
@@ -178,5 +178,19 @@ describe('isolatedGroupRules', () => {
 describe('cycleRule', () => {
   it('forbids circular imports', () => {
     expect(cycleRule().to).toEqual({ circular: true });
+  });
+});
+
+describe('unresolvedNameImportRule', () => {
+  it('marks imports by a package name that resolve to no file, from any file of the packages', () => {
+    const rule = unresolvedNameImportRule([{ ...core, name: '@fx/kernel' }, feature]);
+
+    expect(rule?.to.couldNotResolve).toBe(true);
+    expect(matches(rule?.to.path, '@fx/kernel/sub')).toBe(true);
+    expect(matches(rule?.from.path, 'features/auth/src/a.ts')).toBe(true);
+  });
+
+  it('is undefined when no package has a name', () => {
+    expect(unresolvedNameImportRule([core])).toBeUndefined();
   });
 });

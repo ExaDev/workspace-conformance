@@ -161,3 +161,22 @@ export function isolatedGroupRules(packages: readonly WorkspacePackage[], isolat
 export function cycleRule(): ImportRule {
   return { name: 'import-cycle', severity: 'error', comment: 'files may not import each other in a cycle', from: {}, to: { circular: true } };
 }
+
+/**
+ * The rule that reports every import of a named package by a name that resolves to no file. It marks edges for the cycle check to follow, so a finding of it is an import and not a defect.
+ *
+ * It is `undefined` when no package has a name.
+ */
+export function unresolvedNameImportRule(packages: readonly WorkspacePackage[]): ImportRule | undefined {
+  const names = packageNamesPattern(packages);
+
+  return names === undefined
+    ? undefined
+    : {
+        name: 'unresolved-name-import',
+        severity: 'error',
+        comment: 'marks an import of a workspace package by a name that resolves to no file',
+        from: { path: packagesPattern(packages) },
+        to: { path: names, couldNotResolve: true },
+      };
+}

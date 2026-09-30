@@ -50,7 +50,7 @@ export interface ImportCheckSpec {
 /**
  * The package a path in the graph belongs to: the one whose directory holds the file, and only when no directory does, the one whose name the path is (an import that resolved to no file is known only by the name it was written with, or a subpath of it). The directory wins because an unscoped package name can equal the leading directory of another package's files. It throws `ConformanceError` for a path the graph should not contain.
  */
-function packageOfPath(packages: readonly WorkspacePackage[], path: string): WorkspacePackage {
+export function packageOfPath(packages: readonly WorkspacePackage[], path: string): WorkspacePackage {
   const found =
     packages.find((member) => path.startsWith(`${member.dir}/`)) ??
     packages.find((member) => member.name !== undefined && (path === member.name || path.startsWith(`${member.name}/`)));
