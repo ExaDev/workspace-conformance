@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs the packed tarball into a scratch project that holds a small workspace with known violations, and runs the checks through it as ESM, as CommonJS and as the command line.
-# Usage: install-check.sh <directory holding the .tgz> <cosmiconfig major> <scratch directory>
+# Usage: install-check.sh <directory holding the .tgz> <cosmiconfig major> <scratch directory> [typescript version]
 set -euo pipefail
 # A caller that is itself a git hook exports the repository it runs for, which would make the `git init` below act on that repository.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE
@@ -9,8 +9,11 @@ pack_dir=$1
 cosmiconfig_major=$2
 scratch=$3
 here=$(cd "$(dirname "$0")" && pwd)
-# The TypeScript the repository itself uses, so the consumer check does not drift with TypeScript releases.
-typescript_version=$(node -p "require(process.argv[1]).devDependencies.typescript" "$here/../../package.json")
+# The TypeScript to install: the fourth argument (an entry of the peer range), else the one the repository itself uses, so the consumer check does not drift with TypeScript releases.
+typescript_version=${4:-}
+if [ -z "$typescript_version" ]; then
+  typescript_version=$(node -p "require(process.argv[1]).devDependencies.typescript" "$here/../../package.json")
+fi
 
 mkdir -p "$scratch"
 cd "$scratch"

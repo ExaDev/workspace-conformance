@@ -117,9 +117,9 @@ jobs:
           path: reports/stryker-incremental.json
           key: stryker-incremental-${{ github.run_id }}
 
-  # The packed tarball, not the source tree, is what consumers install: this proves the published files, exports map, command line entry and peer dependencies work in a clean project on every Node line the package supports and on both cosmiconfig majors. The toolchain needs Node 22, so the package is built and packed on 22 and the consumer check runs on the Node under test.
+  # The packed tarball, not the source tree, is what consumers install: this proves the published files, exports map, command line entry and peer dependencies work in a clean project on every Node line the package supports, on both cosmiconfig majors and on the lowest TypeScript of the peer range. The toolchain needs Node 22, so the package is built and packed on 22 and the consumer check runs on the Node under test.
   package:
-    name: Package (Node ${{ matrix.node }}, cosmiconfig ${{ matrix.cosmiconfig }})
+    name: Package (Node ${{ matrix.node }}, cosmiconfig ${{ matrix.cosmiconfig }}${{ matrix.typescript && format(', TypeScript {0}', matrix.typescript) || '' }})
     needs: determine-runner
     runs-on: ${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
     timeout-minutes: 15
@@ -132,6 +132,8 @@ jobs:
           - { node: '24', cosmiconfig: '9' }
           - { node: '24', cosmiconfig: '10' }
           - { node: '26', cosmiconfig: '10' }
+          # The lowest TypeScript of the peer range; the other entries install the version the repository itself uses.
+          - { node: '24', cosmiconfig: '10', typescript: '5.9' }
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -146,7 +148,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Install the tarball into a scratch project and run the checks through it, as ESM, as CommonJS and as the command line
-        run: bash test/package/install-check.sh "$RUNNER_TEMP/pack" "${{ matrix.cosmiconfig }}" "$RUNNER_TEMP/scratch"
+        run: bash test/package/install-check.sh "$RUNNER_TEMP/pack" "${{ matrix.cosmiconfig }}" "$RUNNER_TEMP/scratch" "${{ matrix.typescript }}"
 
   required-checks:
     name: Required Checks
