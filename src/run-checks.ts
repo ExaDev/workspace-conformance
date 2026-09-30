@@ -1,4 +1,5 @@
 import { type ConfigFileOptions, type LayoutConfig, layoutSection, loadSection } from '@exadev/config';
+import { validateStandard } from 'cosmiconfig-extends';
 
 import type { Violation } from './check';
 import { type ConformanceConfig, conformanceSection } from './config';
@@ -24,11 +25,11 @@ export interface RunChecksOptions {
    */
   readonly checks?: readonly CheckName[];
   /**
-   * The `conformance` section, instead of loading it from `cwd`.
+   * The `conformance` section, instead of loading it from `cwd`. It is validated against the section's schema.
    */
   readonly config?: ConformanceConfig;
   /**
-   * The `layout` section, instead of loading it from `cwd`. Read only by the checks that need it.
+   * The `layout` section, instead of loading it from `cwd`. It is validated against the section's schema. Read only by the checks that need it.
    */
   readonly layout?: LayoutConfig;
   /**
@@ -65,7 +66,7 @@ export interface RunResult {
 
 async function conformanceOf(options: RunChecksOptions): Promise<ConformanceConfig> {
   if (options.config !== undefined) {
-    return options.config;
+    return validateStandard(conformanceSection.schema, options.config, `'${conformanceSection.name}' section passed to runChecks`);
   }
   const loaded = await loadSection(conformanceSection, { ...options.configFiles, cwd: options.cwd });
   if (loaded === undefined) {
@@ -76,8 +77,11 @@ async function conformanceOf(options: RunChecksOptions): Promise<ConformanceConf
 }
 
 async function layoutOf(options: RunChecksOptions, needed: readonly CheckName[]): Promise<LayoutConfig | undefined> {
-  if (needed.length === 0 || options.layout !== undefined) {
-    return options.layout;
+  if (options.layout !== undefined) {
+    return validateStandard(layoutSection.schema, options.layout, `'${layoutSection.name}' section passed to runChecks`);
+  }
+  if (needed.length === 0) {
+    return undefined;
   }
   const loaded = await loadSection(layoutSection, { ...options.configFiles, cwd: options.cwd });
   if (loaded === undefined) {
@@ -107,7 +111,7 @@ function selected(config: ConformanceConfig, requested: readonly CheckName[] | u
 /**
  * Run the enabled checks, or the enabled ones among `checks`, and return what they found. Sections not supplied in the options are loaded from `cwd` with `@exadev/config`.
  *
- * Violations do not throw. It throws `ConformanceError` when the checks cannot run (nothing enabled, a requested check disabled, a section missing) and `ConfigValidationError` when a section fails its schema.
+ * Violations do not throw. It throws `ConformanceError` when the checks cannot run (nothing enabled, a requested check disabled, a section missing) and `ConfigValidationError` when a section fails its schema, whether it was loaded from `cwd` or passed in.
  */
 export async function runChecks(options: RunChecksOptions): Promise<RunResult> {
   const config = await conformanceOf(options);

@@ -1,3 +1,4 @@
+import { ConfigValidationError, type LayoutConfig } from '@exadev/config';
 import { describe, expect, it } from 'vitest';
 
 import { importsLayout } from '../test/support/layouts';
@@ -20,6 +21,14 @@ describe('runChecks with the sections supplied', () => {
     expect(result.results.map((entry) => entry.violations.length)).toEqual([1, 1, 2, 1, 1]);
     expect(result.violations).toEqual(result.results.flatMap((entry) => entry.violations));
     expect(result.exitCode).toBe(EXIT_CODES.violations);
+  });
+
+  it('validates the sections passed in as it does the ones it loads', async () => {
+    const isolatingUndeclared = { ...importsLayout, isolatedGroups: [['core', 'undeclared']] satisfies LayoutConfig['isolatedGroups'] };
+    const emptyContracts: ConformanceConfig = { checks: { 'aggregate-mappers': { contracts: [], mapper: 'x' } } };
+
+    await expect(runChecks({ cwd: clean, config: importChecks, layout: isolatingUndeclared })).rejects.toThrow(ConfigValidationError);
+    await expect(runChecks({ cwd: clean, config: emptyContracts })).rejects.toThrow(ConfigValidationError);
   });
 
   it('exits 0 when nothing is found', async () => {
