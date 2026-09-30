@@ -15,7 +15,7 @@ import { declarationLocation, exportedTypes } from './exported-types';
  * It looks for the file, not for what is in it, and it counts a type as exported when the contract re-exports it.
  */
 export const aggregateMappers: CheckFunction<AggregateMappersOptions> = async ({ cwd, options }) => {
-  const { project, files } = await createProject(cwd, options.tsConfig, options.contracts);
+  const { project, files } = await createProject(cwd, options.tsConfig, options.contracts, { check: 'aggregate-mappers', files: 'contracts' });
   const excluded = new Set(options.exclude);
   const violations: Violation[] = [];
 
