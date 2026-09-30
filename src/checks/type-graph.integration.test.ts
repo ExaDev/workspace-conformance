@@ -99,6 +99,15 @@ describe('command-types', () => {
     expect(await commandTypes({ cwd: clean, options: commandOptions })).toEqual([]);
   });
 
+  it('follows local aliases and renamed imports to the inference, and judges the type an alias stands for', async () => {
+    const violations = await commandTypes({ cwd: fixturePath('type-graph', 'aliases'), options: { commands: ['commands.ts'] } });
+
+    expect(violations.map((violation) => [violation.code, violation.message.split(' ')[0]])).toEqual([
+      ['command-types/hand-written-alias', 'ViaHandWritten'],
+      ['command-types/hand-written-alias', 'ViaGeneric'],
+    ]);
+  });
+
   it('takes the generics that count as inference from the options', async () => {
     const violations = await commandTypes({ cwd: clean, options: { ...commandOptions, inferences: ['infer'] } });
 

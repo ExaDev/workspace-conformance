@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 
-import { Node } from 'ts-morph';
+import { type EntityName, Node, type TypeAliasDeclaration } from 'ts-morph';
 
 import type { CheckFunction, Violation } from '../check';
 import type { CommandTypesOptions } from '../options';
@@ -19,22 +19,52 @@ export const DEFAULT_INFERENCES: readonly string[] = ['infer', 'input', 'output'
 const STANDARD_SCHEMA_MEMBER = '~standard';
 
 /**
- * Why a command type is not derived from a schema, or `undefined` when it is.
+ * The names a type reference goes by: the last name as written, and the name it was declared with when that differs, as for `Infer` in `import type { infer as Infer } from 'zod'`, which is also `infer`. A library may itself re-export a generic under another name, so both count.
  */
-function problem(declaration: ExportedType, name: string, inferences: readonly string[]): { readonly reason: string; readonly message: string } | undefined {
+function namesOf(typeName: EntityName): readonly string[] {
+  const identifier = Node.isQualifiedName(typeName) ? typeName.getRight() : typeName;
+  const symbol = identifier.getSymbol();
+  const declared = (symbol?.getAliasedSymbol() ?? symbol)?.getName();
+
+  return declared === undefined ? [identifier.getText()] : [...new Set([identifier.getText(), declared])];
+}
+
+/**
+ * The local alias without type parameters that a type reference names, or `undefined` when it names anything else. Such an alias is a name for the type it is written as, so it is judged by that.
+ */
+function aliasNamed(typeName: EntityName): TypeAliasDeclaration | undefined {
+  const symbol = typeName.getSymbol();
+  const declaration = (symbol?.getAliasedSymbol() ?? symbol)?.getDeclarations().find(Node.isTypeAliasDeclaration);
+
+  return declaration?.getTypeParameters().length === 0 ? declaration : undefined;
+}
+
+/**
+ * Why a command type is not derived from a schema, or `undefined` when it is. `followed` holds the aliases already followed from the exported type, so a chain of aliases is followed to its end and a loop of them is not followed twice.
+ */
+function problem(
+  declaration: ExportedType,
+  name: string,
+  inferences: readonly string[],
+  followed: ReadonlySet<TypeAliasDeclaration> = new Set(),
+): { readonly reason: string; readonly message: string } | undefined {
   if (Node.isInterfaceDeclaration(declaration)) {
     return { reason: 'hand-written-interface', message: `${name} is a hand-written interface; derive the command from its schema` };
   }
   const written = declaration.getTypeNode();
   if (Node.isTypeReference(written)) {
-    const inference = written.getTypeName().getText().split('.').pop();
-    if (inference !== undefined && inferences.includes(inference)) {
+    const inference = namesOf(written.getTypeName()).find((candidate) => inferences.includes(candidate));
+    if (inference !== undefined) {
       const [argument] = written.getTypeArguments();
       if (argument !== undefined && Node.isTypeQuery(argument) && argument.getExprName().getType().getProperty(STANDARD_SCHEMA_MEMBER) !== undefined) {
         return undefined;
       }
 
       return { reason: 'not-a-schema', message: `${name} applies '${inference}' to something that is not a schema: its type has no '${STANDARD_SCHEMA_MEMBER}' member` };
+    }
+    const alias = aliasNamed(written.getTypeName());
+    if (alias !== undefined && !followed.has(alias)) {
+      return problem(alias, name, inferences, new Set([...followed, alias]));
     }
   }
 
