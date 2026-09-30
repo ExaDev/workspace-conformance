@@ -10,7 +10,7 @@ It complements the workspace architecture rules of [`@exadev/eslint-config`](htt
 pnpm add -D workspace-conformance @exadev/config cosmiconfig typescript
 ```
 
-`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`>=5.0.0 <7.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7; ts-morph bundles its own compiler and does not use yours. The package supports Node 20 and later.
+`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`^5.9.0 || ^6.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7; ts-morph bundles its own compiler and does not use yours. The package supports Node 20 and later.
 
 Configure the checks in `exadev.config.ts`:
 
