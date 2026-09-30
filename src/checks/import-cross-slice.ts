@@ -2,7 +2,7 @@ import type { LayoutCheckFunction } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { crossSliceRules } from '../workspace/rules';
-import { describePackage, runImportCheck } from './import-graph';
+import { describePackage, describeTarget, runImportCheck } from './import-graph';
 
 /**
  * A package imports a package in a different slice.
@@ -18,6 +18,6 @@ export const importCrossSlice: LayoutCheckFunction<ImportGraphOptions> = async (
 
       return crossSliceRules(packages);
     },
-    message: ({ from, to, toFile }) =>
-      `${describePackage(from)} (slice '${String(from.slice)}') imports ${toFile} in ${describePackage(to)} (slice '${String(to.slice)}')`,
+    message: (edge) =>
+      `${describePackage(edge.from)} (slice '${String(edge.from.slice)}') imports ${describeTarget(edge)} (slice '${String(edge.to.slice)}')`,
   });

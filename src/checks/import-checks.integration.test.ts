@@ -88,13 +88,13 @@ describe('options', () => {
     expect(violations).toEqual([]);
   });
 
-  it('resolves imports through the tsconfig named by tsConfig, and not without it', async () => {
+  it('resolves an alias through the tsconfig named by tsConfig, and not without it', async () => {
     const workspace = await makeTempDir();
     await writeFiles(workspace, {
       'pnpm-workspace.yaml': 'packages:\n  - core/*\n  - features/*\n',
-      'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', baseUrl: '.', paths: { '@fx/billing': ['features/billing/src/index.ts'] } } }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', baseUrl: '.', paths: { '@alias/billing': ['features/billing/src/index.ts'] } } }),
       'core/kernel/package.json': '{ "name": "@fx/kernel" }',
-      'core/kernel/src/index.ts': "import { billing } from '@fx/billing';\nexport const kernel = billing;\n",
+      'core/kernel/src/index.ts': "import { billing } from '@alias/billing';\nexport const kernel = billing;\n",
       'features/billing/package.json': '{ "name": "@fx/billing" }',
       'features/billing/src/index.ts': 'export const billing = 1;\n',
     });
@@ -105,6 +105,58 @@ describe('options', () => {
 
     expect(without).toEqual([]);
     expect(summary(withPaths)).toEqual([['import-uphill/higher-rank', 'core/kernel/src/index.ts']]);
+  });
+});
+
+describe('imports of a package by name', () => {
+  const layout = { groups: [{ name: 'core', rank: 0 }, { name: 'features', rank: 1 }] };
+  const base = {
+    'pnpm-workspace.yaml': 'packages:\n  - core/*\n  - features/*\n',
+    'core/kernel/package.json': '{ "name": "@fx/kernel" }',
+    'features/billing/package.json': '{ "name": "@fx/billing", "exports": { ".": "./dist/index.js" } }',
+    'features/billing/src/index.ts': "import { kernel } from '@fx/kernel';\nexport const billing = kernel;\n",
+    'core/kernel/src/index.ts': 'export const kernel = 1;\n',
+  };
+
+  it('are attributed to the package when the name resolves nowhere, as in a workspace that is not installed or built', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, { ...base, 'core/kernel/src/index.ts': "import { billing } from '@fx/billing';\nexport const kernel = billing;\n" });
+
+    const violations = await importUphill({ cwd: workspace, layout, options: {} });
+
+    expect(summary(violations)).toEqual([['import-uphill/higher-rank', 'core/kernel/src/index.ts']]);
+    expect(violations[0]?.message).toBe('@fx/kernel (rank 0) imports @fx/billing (rank 1), a higher rank');
+  });
+
+  it('are attributed to the package when they name a subpath of it', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, { ...base, 'core/kernel/src/index.ts': "import { extra } from '@fx/billing/extra';\nexport const kernel = extra;\n" });
+
+    expect(summary(await importUphill({ cwd: workspace, layout, options: {} }))).toEqual([['import-uphill/higher-rank', 'core/kernel/src/index.ts']]);
+  });
+
+  it('do not take a package whose name only starts with the same characters for it', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, { ...base, 'core/kernel/src/index.ts': "import { billing } from '@fx/billing-extras';\nexport const kernel = billing;\n" });
+
+    expect(await importUphill({ cwd: workspace, layout, options: {} })).toEqual([]);
+  });
+
+  it('reach a package through its build output, which is a target and never a dependant', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      ...base,
+      'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', baseUrl: '.', paths: { '@fx/billing': ['features/billing/dist/index.js'] } } }),
+      'core/kernel/src/index.ts': "import { billing } from '@fx/billing';\nexport const kernel = billing;\n",
+      'features/billing/dist/index.js': "import { kernel } from '../../../core/kernel/src/index';\nexport const billing = kernel;\n",
+    });
+
+    const options = { tsConfig: 'tsconfig.json' };
+
+    expect(summary(await importUphill({ cwd: workspace, layout, options }))).toEqual([['import-uphill/higher-rank', 'core/kernel/src/index.ts']]);
+    expect(summary(await importUphill({ cwd: workspace, layout, options: { ...options, doNotFollow: [] } }))).toEqual([
+      ['import-uphill/higher-rank', 'core/kernel/src/index.ts'],
+    ]);
   });
 });
 

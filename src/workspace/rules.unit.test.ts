@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ConformanceError } from '../errors';
 import type { WorkspacePackage } from './packages';
-import { crossSliceRules, cycleRule, isolatedGroupRules, packagesPattern, rankSkipRules, ranked, uphillRules } from './rules';
+import { crossSliceRules, cycleRule, graphScopePattern, isolatedGroupRules, packageNamesPattern, packagesPattern, rankSkipRules, ranked, uphillRules } from './rules';
 
 function member(dir: string, group: string, rank: number | undefined, slice?: string): WorkspacePackage {
   return { dir, name: undefined, group, rank, slice };
@@ -36,6 +36,59 @@ describe('packagesPattern', () => {
 
     expect(matches(pattern, 'packages/a.b+c/src/x.ts')).toBe(true);
     expect(matches(pattern, 'packages/aXb+c/src/x.ts')).toBe(false);
+  });
+});
+
+describe('packageNamesPattern', () => {
+  const named = [{ ...core, name: '@fx/kernel' }, { ...feature, name: 'plain.name' }, feature];
+
+  it('matches the name of a package and a subpath of it, and nothing that only starts with it', () => {
+    const pattern = packageNamesPattern(named);
+
+    expect(matches(pattern, '@fx/kernel')).toBe(true);
+    expect(matches(pattern, '@fx/kernel/sub/path')).toBe(true);
+    expect(matches(pattern, '@fx/kernel-extras')).toBe(false);
+    expect(matches(pattern, 'x@fx/kernel')).toBe(false);
+  });
+
+  it('escapes characters that mean something in a regular expression, and skips packages without a name', () => {
+    const pattern = packageNamesPattern(named);
+
+    expect(matches(pattern, 'plain.name')).toBe(true);
+    expect(matches(pattern, 'plainXname')).toBe(false);
+  });
+
+  it('is undefined when no package has a name', () => {
+    expect(packageNamesPattern([core])).toBeUndefined();
+  });
+});
+
+describe('graphScopePattern', () => {
+  it('covers the files of the packages and the names they are imported by', () => {
+    const pattern = graphScopePattern([{ ...core, name: '@fx/kernel' }]);
+
+    expect(matches(pattern, 'core/kernel/src/a.ts')).toBe(true);
+    expect(matches(pattern, '@fx/kernel/sub')).toBe(true);
+    expect(matches(pattern, 'features/auth/src/a.ts')).toBe(false);
+  });
+
+  it('is the files alone when no package has a name', () => {
+    expect(graphScopePattern([core])).toBe(packagesPattern([core]));
+  });
+});
+
+describe('rules for named packages', () => {
+  it('pair each rule with one for imports of the target packages by name that resolve to no file', () => {
+    const rules = uphillRules([{ ...core, name: '@fx/kernel' }, { ...feature, name: '@fx/auth' }]);
+
+    expect(rules.map((rule) => rule.name)).toEqual(['uphill-rank-0', 'uphill-rank-0-by-name']);
+    expect(rules[1]?.to.couldNotResolve).toBe(true);
+    expect(matches(rules[1]?.to.path, '@fx/auth/sub')).toBe(true);
+    expect(matches(rules[1]?.to.path, '@fx/kernel')).toBe(false);
+  });
+
+  it('make no by-name rule when the target packages have no name', () => {
+    expect(uphillRules(packages).map((rule) => rule.name)).toEqual(['uphill-rank-0', 'uphill-rank-1']);
   });
 });
 
