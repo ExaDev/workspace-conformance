@@ -1,7 +1,7 @@
 export type { CheckContext, CheckFunction, LayoutCheckContext, LayoutCheckFunction, SourceLocation, Violation } from './check';
 export { aggregateMappers } from './checks/aggregate-mappers';
 export { commandTypes, DEFAULT_INFERENCES } from './checks/command-types';
-export { commitTypes } from './checks/commit-types';
+export { commitTypes, PRESET_COMMIT_TYPES } from './checks/commit-types';
 export { dockerfilePackageManager } from './checks/dockerfile-package-manager';
 export { importCrossSlice } from './checks/import-cross-slice';
 export { importCycles } from './checks/import-cycles';
