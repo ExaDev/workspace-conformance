@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 
 import type { CheckFunction } from '../check';
-import { findDirectories } from '../files';
+import { excludedFrom, findDirectories } from '../files';
 import type { SingleStorybookOptions } from '../options';
 
 const STORYBOOK_DIRECTORY = '.storybook';
@@ -12,7 +12,7 @@ const STORYBOOK_DIRECTORY = '.storybook';
 export const singleStorybook: CheckFunction<SingleStorybookOptions> = async ({ cwd, options }) => {
   const location = posix.normalize(options.location ?? '.');
   const permitted = posix.normalize(posix.join(location, STORYBOOK_DIRECTORY));
-  const found = await findDirectories(cwd, [`**/${STORYBOOK_DIRECTORY}`]);
+  const found = await findDirectories(cwd, [`**/${STORYBOOK_DIRECTORY}`, ...excludedFrom(options.exclude)]);
 
   return found
     .filter((directory) => directory !== permitted)

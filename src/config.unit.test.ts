@@ -25,9 +25,9 @@ describe('conformanceSchema', () => {
         'import-rank-skip': { exclude: ['^x/'], doNotFollow: ['^y/'], tsConfig: 'tsconfig.json' },
         'import-cross-slice': false,
         'instruction-symlinks': { files: ['AGENTS.md'], directories: ['.'], target: 'README.md' },
-        'single-storybook': { location: '.' },
+        'single-storybook': { location: '.', exclude: ['test/fixtures/**'] },
         'commit-types': { commitlint: 'c.ts', release: 'r.ts' },
-        'dockerfile-package-manager': { dockerfiles: ['Dockerfile'], packageJson: 'package.json' },
+        'dockerfile-package-manager': { dockerfiles: ['Dockerfile'], exclude: ['test/fixtures/**'], packageJson: 'package.json' },
       },
     };
 
