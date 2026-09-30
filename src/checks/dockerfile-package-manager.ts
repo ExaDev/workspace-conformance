@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import type { CheckFunction, Violation } from '../check';
 import { isRecord } from '../config-files';
-import { findFiles } from '../files';
+import { excludedFrom, findFiles } from '../files';
 import type { DockerfilePackageManagerOptions } from '../options';
 
 const DEFAULT_DOCKERFILES: readonly string[] = ['**/Dockerfile', '**/Dockerfile.*', '**/*.Dockerfile'];
@@ -35,7 +35,7 @@ export const dockerfilePackageManager: CheckFunction<DockerfilePackageManagerOpt
   }
 
   const violations: Violation[] = [];
-  for (const file of await findFiles(cwd, options.dockerfiles ?? DEFAULT_DOCKERFILES)) {
+  for (const file of await findFiles(cwd, [...(options.dockerfiles ?? DEFAULT_DOCKERFILES), ...excludedFrom(options.exclude)])) {
     (await readFile(resolve(cwd, file), 'utf8')).split('\n').forEach((text, index) => {
       if (text.trimStart().startsWith('#')) {
         return;

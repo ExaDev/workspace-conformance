@@ -102,6 +102,12 @@ describe('single-storybook', () => {
     ]);
   });
 
+  it('does not search the paths exclude names', async () => {
+    const violations = await singleStorybook({ cwd: fixturePath('storybook', 'violating'), options: { exclude: ['apps/**'] } });
+
+    expect(violations.map((violation) => violation.file)).toEqual(['packages/ui/.storybook']);
+  });
+
   it('permits the Storybook in the directory the options name instead of the root', async () => {
     const violations = await singleStorybook({ cwd: fixturePath('storybook', 'violating'), options: { location: 'packages/ui' } });
 
@@ -183,6 +189,12 @@ describe('dockerfile-package-manager', () => {
         location: { line: 1, column: 20 },
       },
     ]);
+  });
+
+  it('does not search the paths exclude names', async () => {
+    const violations = await dockerfilePackageManager({ cwd: fixturePath('dockerfile', 'violating'), options: { exclude: ['docker/**'] } });
+
+    expect(violations.map((violation) => violation.file)).toEqual(['Dockerfile']);
   });
 
   it('reads the Dockerfiles the options name', async () => {

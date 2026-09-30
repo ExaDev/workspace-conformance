@@ -90,6 +90,10 @@ export interface SingleStorybookOptions {
    * The only directory that may hold a `.storybook` directory, relative to the directory the checks run in. The directory itself (`.`) when omitted.
    */
   readonly location?: string;
+  /**
+   * Globs of paths that are not searched, such as directories of test fixtures that hold a Storybook on purpose.
+   */
+  readonly exclude?: readonly string[];
 }
 
 /**
@@ -114,6 +118,10 @@ export interface DockerfilePackageManagerOptions {
    * Globs of the Dockerfiles, relative to the directory the checks run in. `Dockerfile`, `Dockerfile.*` and `*.Dockerfile` at any depth when omitted.
    */
   readonly dockerfiles?: readonly string[];
+  /**
+   * Globs of paths that are not searched, such as directories of test fixtures.
+   */
+  readonly exclude?: readonly string[];
   /**
    * The package.json that holds the `packageManager` field. `package.json` when omitted.
    */
