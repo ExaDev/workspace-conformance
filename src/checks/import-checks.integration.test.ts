@@ -108,6 +108,24 @@ describe('options', () => {
   });
 });
 
+describe('a tsconfig with paths and no baseUrl', () => {
+  it('resolves aliases relative to the tsconfig whatever directory the process runs in', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'pnpm-workspace.yaml': 'packages:\n  - core/*\n  - apps/*\n',
+      'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', paths: { '~web/*': ['./apps/web/src/*'] } } }),
+      'core/kernel/package.json': '{ "name": "@fx/kernel" }',
+      'core/kernel/src/index.ts': "import { web } from '~web/index';\nexport const kernel = web;\n",
+      'apps/web/package.json': '{ "name": "@fx/web" }',
+      'apps/web/src/index.ts': 'export const web = 1;\n',
+    });
+    const layout = { groups: [{ name: 'core', rank: 0 }, { name: 'apps', rank: 1 }] };
+
+    expect(process.cwd()).not.toBe(workspace);
+    expect(summary(await importUphill({ cwd: workspace, layout, options: { tsConfig: 'tsconfig.json' } }))).toEqual([['import-uphill/higher-rank', 'core/kernel/src/index.ts']]);
+  });
+});
+
 describe('imports of a package by name', () => {
   const layout = { groups: [{ name: 'core', rank: 0 }, { name: 'features', rank: 1 }] };
   const base = {

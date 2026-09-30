@@ -84,7 +84,7 @@ All import checks take these options:
 
 How an import is attributed to a package, and the limits of that:
 
-- An import that dependency-cruiser resolves to a file counts against the package whose directory holds the file. A relative import resolves without an install, a path alias needs `tsConfig`, and a package name resolves through the `node_modules` link pnpm makes for a workspace package and the package's `exports` or `main`.
+- An import that dependency-cruiser resolves to a file counts against the package whose directory holds the file. A relative import resolves without an install, a path alias needs `tsConfig` (`paths` without `baseUrl` resolves relative to that tsconfig, wherever the command runs), and a package name resolves through the `node_modules` link pnpm makes for a workspace package and the package's `exports` or `main`.
 - An import of a workspace package by its name (or a subpath of it) that resolves to no file, because the workspace is not installed or the package's entry point is not built, is attributed to the package by name. An import that neither resolves nor names a workspace package, such as an alias without `tsConfig` that is not a package name, is not seen, so a check can look cleaner than the workspace is; give `tsConfig` when aliases are used.
 - Type-only imports and dynamic `import()` count, because a type dependency is still a dependency.
 - Test and tooling files inside a package are part of the package. Use `exclude` for paths that may cross layers.

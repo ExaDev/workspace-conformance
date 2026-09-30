@@ -1,7 +1,8 @@
 import { realpath } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import type { IViolation } from 'dependency-cruiser';
+import type { ParsedCommandLine } from 'typescript';
 
 import type { LayoutCheckContext, Violation } from '../check';
 import { ConformanceError } from '../errors';
@@ -59,6 +60,15 @@ function packageOfPath(packages: readonly WorkspacePackage[], path: string): Wor
 }
 
 /**
+ * The tsconfig as dependency-cruiser should read its compiler options, with `baseUrl` set when the tsconfig has none.
+ *
+ * dependency-cruiser hands its path alias resolver a `baseUrl` of `./` when the parsed tsconfig has none, and that resolves against the working directory of the process, not against the tsconfig. `paths` without `baseUrl` is the form TypeScript 4.1 and later accepts (`baseUrl` is deprecated), and it means relative to the tsconfig. Given any `baseUrl`, dependency-cruiser leaves the alias resolver to read the tsconfig file itself, which applies that meaning wherever the process runs. The value set here is only that signal and is never used as a directory.
+ */
+function withBaseUrl(parsed: ParsedCommandLine, tsConfigFile: string): ParsedCommandLine {
+  return 'baseUrl' in parsed.options ? parsed : { ...parsed, options: { ...parsed.options, baseUrl: dirname(tsConfigFile) } };
+}
+
+/**
  * The violations of `rules` among the files of `packages`. The graph is limited to the packages' own files, so nothing outside them is a dependant or a dependency.
  *
  * The base directory is the real path of the root: dependency-cruiser resolves symbolic links, so the path of a file behind one would otherwise not be relative to it.
@@ -93,7 +103,7 @@ export async function cruiseViolations(input: {
       ...(tsConfigFile === undefined ? {} : { tsConfig: { fileName: tsConfigFile } }),
     },
     {},
-    tsConfigFile === undefined ? {} : { tsConfig: extractTsConfig(tsConfigFile) },
+    tsConfigFile === undefined ? {} : { tsConfig: withBaseUrl(extractTsConfig(tsConfigFile), tsConfigFile) },
   );
   if (typeof result.output === 'string') {
     throw new ConformanceError('dependency-cruiser returned text where a result object was requested');
