@@ -42,6 +42,13 @@ describe('discoverPackages', () => {
     expect(found.map((member) => member.dir)).toEqual(['a']);
   });
 
+  it('fails naming the manifest that is not valid JSON', async () => {
+    const root = await makeTempDir();
+    await writeFiles(root, { 'a/package.json': '{ "name": ' });
+
+    await expect(discoverPackages(root, ['a'])).rejects.toThrow('a/package.json cannot be read as JSON');
+  });
+
   it('reads a package without a name as one that has none', async () => {
     const root = await makeTempDir();
     await writeFiles(root, { 'a/package.json': '{ "private": true }' });
