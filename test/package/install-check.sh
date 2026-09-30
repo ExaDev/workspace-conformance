@@ -15,7 +15,7 @@ typescript_version=$(node -p "require(process.argv[1]).devDependencies.typescrip
 mkdir -p "$scratch"
 cd "$scratch"
 npm init -y > /dev/null
-npm install "$pack_dir"/*.tgz "cosmiconfig@$cosmiconfig_major" "typescript@$typescript_version" @exadev/config
+npm install --engine-strict "$pack_dir"/*.tgz "cosmiconfig@$cosmiconfig_major" "typescript@$typescript_version" @exadev/config
 
 cp "$here/check.mjs" "$here/check.cjs" .
 
