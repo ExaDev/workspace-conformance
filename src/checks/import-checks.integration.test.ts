@@ -178,6 +178,42 @@ describe('imports of a package by name', () => {
   });
 });
 
+describe('attributing a path to a package', () => {
+  it('prefers the package whose directory holds a file over one whose name is the start of its path', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'pnpm-workspace.yaml': 'packages:\n  - core/*\n  - apps/*\n',
+      'core/kernel/package.json': '{ "name": "@w/kernel" }',
+      'core/kernel/src/index.ts': "import { app } from '../../../apps/core/src/index';\nexport const kernel = app;\n",
+      'apps/core/package.json': '{ "name": "core" }',
+      'apps/core/src/index.ts': 'export const app = 1;\n',
+    });
+    const layout = { groups: [{ name: 'core', rank: 0 }, { name: 'apps', rank: 1 }] };
+
+    const [violation] = await importUphill({ cwd: workspace, layout, options: {} });
+
+    expect(violation?.message).toBe('@w/kernel (rank 0) imports apps/core/src/index.ts in core (rank 1), a higher rank');
+  });
+});
+
+describe('naming the target of an import', () => {
+  it('names the file and its package when the package name is also the start of the file path', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'pnpm-workspace.yaml': 'packages:\n  - core/*\n  - apps/*\n',
+      'core/kernel/package.json': '{ "name": "@w/kernel" }',
+      'core/kernel/src/index.ts': "import { web } from '../../../apps/web/src/index';\nexport const kernel = web;\n",
+      'apps/web/package.json': '{ "name": "apps" }',
+      'apps/web/src/index.ts': 'export const web = 1;\n',
+    });
+    const layout = { groups: [{ name: 'core', rank: 0 }, { name: 'apps', rank: 1 }] };
+
+    const [violation] = await importUphill({ cwd: workspace, layout, options: {} });
+
+    expect(violation?.message).toBe('@w/kernel (rank 0) imports apps/web/src/index.ts in apps (rank 1), a higher rank');
+  });
+});
+
 describe('a layout root other than the working directory', () => {
   it('reports files relative to the working directory', async () => {
     const violations = await importUphill({ cwd: fixturePath('imports'), layout: { ...importsLayout, root: 'violating' }, options: {} });

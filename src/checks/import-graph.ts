@@ -48,10 +48,12 @@ export interface ImportCheckSpec {
 }
 
 /**
- * The package a path in the graph belongs to: the one whose directory holds the file, or the one whose name the path is (an import that resolved to no file is known only by the name it was written with, or a subpath of it). It throws `ConformanceError` for a path the graph should not contain.
+ * The package a path in the graph belongs to: the one whose directory holds the file, and only when no directory does, the one whose name the path is (an import that resolved to no file is known only by the name it was written with, or a subpath of it). The directory wins because an unscoped package name can equal the leading directory of another package's files. It throws `ConformanceError` for a path the graph should not contain.
  */
 function packageOfPath(packages: readonly WorkspacePackage[], path: string): WorkspacePackage {
-  const found = packages.find((member) => path.startsWith(`${member.dir}/`) || (member.name !== undefined && (path === member.name || path.startsWith(`${member.name}/`))));
+  const found =
+    packages.find((member) => path.startsWith(`${member.dir}/`)) ??
+    packages.find((member) => member.name !== undefined && (path === member.name || path.startsWith(`${member.name}/`)));
   if (found === undefined) {
     throw new ConformanceError(`${path} is in no workspace package, although the graph is limited to the packages' files and names`);
   }
@@ -147,7 +149,7 @@ export function describePackage(member: WorkspacePackage): string {
  */
 export function describeTarget(edge: ImportEdge): string {
   const { to, toFile } = edge;
-  const byName = to.name !== undefined && (toFile === to.name || toFile.startsWith(`${to.name}/`));
+  const byName = !toFile.startsWith(`${to.dir}/`) && to.name !== undefined && (toFile === to.name || toFile.startsWith(`${to.name}/`));
 
   return byName ? toFile : `${toFile} in ${describePackage(to)}`;
 }
