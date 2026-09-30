@@ -92,6 +92,52 @@ describe('aggregate-mappers', () => {
   });
 });
 
+describe('types inside namespaces', () => {
+  async function workspaceWithNamespaces(): Promise<string> {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'tsconfig.json': '{ "compilerOptions": { "strict": true } }',
+      'contract.ts': [
+        'export namespace Hidden {',
+        '  export interface Handwritten { readonly id: string }',
+        '  export namespace Deeper { export type Nested = { readonly id: string } }',
+        '  interface NotExported { readonly id: string }',
+        '}',
+        "export * as Reexported from './shapes';",
+      ].join('\n'),
+      'shapes.ts': 'export interface Loose { readonly id: string }\n',
+    });
+
+    return workspace;
+  }
+
+  it('are judged by command-types under their qualified names', async () => {
+    const cwd = await workspaceWithNamespaces();
+
+    const violations = await commandTypes({ cwd, options: { commands: ['contract.ts'] } });
+
+    expect(violations.map((violation) => [violation.code, violation.message.split(' ')[0]])).toEqual([
+      ['command-types/hand-written-interface', 'Hidden.Handwritten'],
+      ['command-types/hand-written-alias', 'Hidden.Deeper.Nested'],
+      ['command-types/hand-written-interface', 'Reexported.Loose'],
+    ]);
+  });
+
+  it('are aggregates of aggregate-mappers under their qualified names, which exclude also matches', async () => {
+    const cwd = await workspaceWithNamespaces();
+    const options = { contracts: ['contract.ts'], mapper: 'mappers/{name}.ts' };
+
+    const violations = await aggregateMappers({ cwd, options });
+
+    expect(violations.map((violation) => violation.message)).toEqual([
+      'Hidden.Handwritten has no mapper at mappers/Hidden.Handwritten.ts',
+      'Hidden.Deeper.Nested has no mapper at mappers/Hidden.Deeper.Nested.ts',
+      'Reexported.Loose has no mapper at mappers/Reexported.Loose.ts',
+    ]);
+    expect(await aggregateMappers({ cwd, options: { ...options, exclude: ['Hidden.Deeper.Nested', 'Hidden.Handwritten', 'Reexported.Loose'] } })).toEqual([]);
+  });
+});
+
 describe('command-types', () => {
   it('reports hand-written interfaces, hand-written aliases and inferences of something that is not a schema', async () => {
     const violations = await commandTypes({ cwd: violating, options: commandOptions });
