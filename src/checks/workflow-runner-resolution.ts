@@ -31,14 +31,18 @@ interface Resolver {
   readonly output: string;
 }
 
-function resolversOf(workflow: Workflow, workflows: readonly Workflow[]): readonly { readonly from: Job; readonly resolver: Resolver | undefined }[] {
+/**
+ * The resolver behind each `fromJson(needs.<job>.outputs.<name>)` in a `runs-on` of the workflow; none for one this check cannot read.
+ */
+function resolversOf(workflow: Workflow, workflows: readonly Workflow[]): readonly Resolver[] {
   return workflow.jobs.flatMap((job) =>
     job.runsOn.expressions.flatMap((expression) =>
-      [...expression.matchAll(RESOLVED_RUNNER)].map((match) => {
+      [...expression.matchAll(RESOLVED_RUNNER)].flatMap((match) => {
         const caller = workflow.jobs.find((candidate) => candidate.id === match[1]);
         const output = match[2];
+        const resolver = caller === undefined || output === undefined ? undefined : implementation(workflow, workflows, caller, output);
 
-        return { from: job, resolver: caller === undefined || output === undefined ? undefined : implementation(workflow, workflows, caller, output) };
+        return resolver === undefined ? [] : [resolver];
       }),
     ),
   );
@@ -117,10 +121,8 @@ export const workflowRunnerResolution: CheckFunction<WorkflowRunnerResolutionOpt
   const available = await loadWorkflows(cwd, { workflows: DEFAULT_WORKFLOWS });
   const resolvers = new Map<string, Resolver>();
   for (const workflow of selected) {
-    for (const { resolver } of resolversOf(workflow, available)) {
-      if (resolver !== undefined) {
-        resolvers.set(`${resolver.workflow.file}#${resolver.job.id}#${resolver.output}`, resolver);
-      }
+    for (const resolver of resolversOf(workflow, available)) {
+      resolvers.set(`${resolver.workflow.file}#${resolver.job.id}#${resolver.output}`, resolver);
     }
   }
 

@@ -21,10 +21,19 @@ function decisionText(job: Job): string {
   return [job.condition, ...job.steps.flatMap((step) => [step.condition, step.run, ...Object.values(step.env), ...Object.values(step.with)])].filter((text) => text !== undefined).join('\n');
 }
 
-const RESULT_TEST = (outcome: string): RegExp => new RegExp(`needs\\.\\*\\.result[^\\n]*['"]${outcome}['"]`, 'u');
-const FAILURE_TEST = RESULT_TEST('failure');
-const CANCELLED_TEST = RESULT_TEST('cancelled');
+/**
+ * Where a script gets the results of the jobs it needs from: `needs.*.result`, one job's `needs.<job>.result` or the whole of `needs`.
+ */
+const RESULT_SOURCE = /needs\.(?:\*|[\w-]+)\.result|toJSON\(\s*needs\s*\)/u;
+const FAILURE_WORD = /['"]failure['"]/u;
+const CANCELLED_WORD = /['"]cancelled['"]/u;
 const SKIPPED_OR_NOT_SUCCESS = /needs\.\*\.result[^\n]*(?:['"]skipped['"]|!==?\s*['"]success['"])|!\s*contains\(\s*needs\.\*\.result\s*,\s*['"]success['"]/u;
+
+/**
+ * An `if` that keeps a job to events other than pull requests: it compares the ref or the event name and never mentions `pull_request`.
+ */
+const RESTRICTS_TO_OTHER_EVENTS = /github\.(?:ref|ref_name|event_name)\s*==/u;
+
 const OUTCOME_ACTION = 're-actors/alls-green';
 
 function releaseAndDocsOrdering(workflow: Workflow, options: WorkflowJobOrderingOptions): readonly Violation[] {
@@ -63,14 +72,26 @@ function releaseAndDocsOrdering(workflow: Workflow, options: WorkflowJobOrdering
   return violations;
 }
 
+/**
+ * The jobs a pull request's required check need not wait for: those the options exempt, those whose `if` keeps them to events other than pull requests, and those that need such a job and so are skipped with it.
+ */
+function exemptFromJunction(workflow: Workflow, junctionExempt: readonly string[]): ReadonlySet<string> {
+  const direct = new Set([
+    ...junctionExempt,
+    ...workflow.jobs.filter((job) => job.condition !== undefined && RESTRICTS_TO_OTHER_EVENTS.test(job.condition) && !job.condition.includes('pull_request')).map((job) => job.id),
+  ]);
+
+  return new Set(workflow.jobs.filter((job) => direct.has(job.id) || [...transitiveNeeds(workflow, job.id)].some((needed) => direct.has(needed))).map((job) => job.id));
+}
+
 function junctionOrdering(workflow: Workflow, options: WorkflowJobOrderingOptions): readonly Violation[] {
   const violations: Violation[] = [];
-  const exempt = options.junctionExempt ?? [];
+  const exempt = exemptFromJunction(workflow, options.junctionExempt ?? []);
   for (const junction of jobsNamed(workflow, options.junctionJobs ?? DEFAULT_JUNCTION_JOBS)) {
     if (!callsAlways(junction.condition)) {
       violations.push(workflowViolation(workflow, 'workflow-job-ordering/junction-not-always', `junction job '${junction.id}' has no if: always(), so it is skipped, and its required check never reports, when a job it needs fails`, junction.location));
     }
-    const missing = workflow.jobs.filter((job) => job.id !== junction.id && !exempt.includes(job.id) && !junction.needs.includes(job.id) && !transitiveNeeds(workflow, job.id).has(junction.id));
+    const missing = workflow.jobs.filter((job) => job.id !== junction.id && !exempt.has(job.id) && !junction.needs.includes(job.id) && !transitiveNeeds(workflow, job.id).has(junction.id));
     for (const job of missing) {
       violations.push(workflowViolation(workflow, 'workflow-job-ordering/junction-missing-need', `junction job '${junction.id}' does not list job '${job.id}' in needs, so its result is not part of the required check`, junction.location));
     }
@@ -79,8 +100,8 @@ function junctionOrdering(workflow: Workflow, options: WorkflowJobOrderingOption
     if (SKIPPED_OR_NOT_SUCCESS.test(text)) {
       violations.push(workflowViolation(workflow, 'workflow-job-ordering/junction-fails-on-skipped', `junction job '${junction.id}' fails when a needed job is skipped, but a skipped job is how a path filter or an if keeps a job out; fail only on 'failure' and 'cancelled'`, junction.location));
     }
-    if (!reportsOutcome && !(FAILURE_TEST.test(text) && CANCELLED_TEST.test(text))) {
-      violations.push(workflowViolation(workflow, 'workflow-job-ordering/junction-no-failure-condition', `junction job '${junction.id}' does not test needs.*.result for both 'failure' and 'cancelled', so it can pass when a job it needs did not succeed`, junction.location));
+    if (!reportsOutcome && !(RESULT_SOURCE.test(text) && FAILURE_WORD.test(text) && CANCELLED_WORD.test(text))) {
+      violations.push(workflowViolation(workflow, 'workflow-job-ordering/junction-no-failure-condition', `junction job '${junction.id}' does not test the results of its needs for both 'failure' and 'cancelled', so it can pass when a job it needs did not succeed`, junction.location));
     }
   }
 
@@ -90,7 +111,7 @@ function junctionOrdering(workflow: Workflow, options: WorkflowJobOrderingOption
 /**
  * The jobs that release, deploy and report a required check are ordered so that a failure stops what follows: a release job needs the deploy job, a documentation deploy job needs the release job and checks out the default branch afresh, and one junction job with `if: always()` needs every other job and fails only on `failure` or `cancelled`.
  *
- * Jobs are recognised by id (see the options), and a role with no job in a workflow is not judged there. Ordering is judged through the transitive `needs` graph; the junction job must list every job directly, because `needs.*.result` only covers direct needs. What the junction job decides on is read as text: a `needs.*.result` test on a line that names `'failure'` and one that names `'cancelled'`, or the `re-actors/alls-green` action; a result read in a way the text does not show, such as by parsing `toJSON(needs)` in a script, is not seen and is reported as incomplete.
+ * Jobs are recognised by id (see the options), and a role with no job in a workflow is not judged there. Ordering is judged through the transitive `needs` graph; the junction job must list every job directly, because `needs.*.result` only covers direct needs, except jobs that never run for a pull request (an `if` on `github.ref` or `github.event_name` that does not mention `pull_request`), jobs that need such a job or the junction job itself, and the ids in `junctionExempt`. What the junction job decides on is read as text: it must read the results of its needs (`needs.*.result`, `needs.<job>.result` or `toJSON(needs)`) and name both `'failure'` and `'cancelled'`, or use the `re-actors/alls-green` action; a result read in a way the text does not show is reported as incomplete.
  */
 export const workflowJobOrdering: CheckFunction<WorkflowJobOrderingOptions> = async ({ cwd, options }) =>
   (await loadWorkflows(cwd, options)).flatMap((workflow) => [...releaseAndDocsOrdering(workflow, options), ...junctionOrdering(workflow, options)]);

@@ -1,4 +1,9 @@
+import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
 import type { CheckFunction, Violation } from '../check';
+import { isRecord } from '../config-files';
 import type { WorkflowCredentialsOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { accessOf, effectiveEnv, effectivePermissions, type Job, type Workflow } from '../workflows/model';
@@ -26,6 +31,20 @@ const TOKEN_VARIABLES: readonly string[] = ['NODE_AUTH_TOKEN', 'NPM_TOKEN'];
 
 const PROVENANCE_FLAG = /--provenance(?!=false)(?:=true)?(?:\s|$)/u;
 
+/**
+ * Whether the `package.json` in the working directory asks for provenance with `publishConfig.provenance: true`, which applies to every publish of that package.
+ */
+async function requestsProvenance(cwd: string): Promise<boolean> {
+  const file = resolve(cwd, 'package.json');
+  if (!existsSync(file)) {
+    return false;
+  }
+  const manifest: unknown = JSON.parse(await readFile(file, 'utf8'));
+  const config = isRecord(manifest) ? manifest['publishConfig'] : undefined;
+
+  return isRecord(config) && config['provenance'] === true;
+}
+
 function attestationViolations(workflow: Workflow, job: Job): readonly Violation[] {
   const permissions = effectivePermissions(workflow, job);
 
@@ -48,7 +67,7 @@ function passesToken(workflow: Workflow, job: Job): boolean {
   return [undefined, ...job.steps].some((step) => TOKEN_VARIABLES.some((variable) => (effectiveEnv(workflow, job, step)[variable] ?? '') !== ''));
 }
 
-function tokenlessPublishViolations(workflow: Workflow, job: Job): readonly Violation[] {
+function tokenlessPublishViolations(workflow: Workflow, job: Job, provenanceInManifest: boolean): readonly Violation[] {
   if (accessOf(effectivePermissions(workflow, job), 'id-token') !== 'write' || passesToken(workflow, job)) {
     return [];
   }
@@ -60,7 +79,7 @@ function tokenlessPublishViolations(workflow: Workflow, job: Job): readonly Viol
     }
     const env = effectiveEnv(workflow, job, step);
     const blanked = TOKEN_VARIABLES.every((variable) => env[variable] === '');
-    const provenance = publishes.some((line) => PROVENANCE_FLAG.test(line)) || env['NPM_CONFIG_PROVENANCE'] === 'true';
+    const provenance = provenanceInManifest || publishes.some((line) => PROVENANCE_FLAG.test(line)) || env['NPM_CONFIG_PROVENANCE'] === 'true';
 
     return blanked || provenance
       ? []
@@ -80,9 +99,12 @@ function tokenlessPublishViolations(workflow: Workflow, job: Job): readonly Viol
  *
  * `workflow-credentials/attestation-permissions`: a step of `actions/attest`, `actions/attest-build-provenance` or `actions/attest-sbom` needs `id-token: write` and `attestations: write` in the job's effective permissions. Permissions a job declares replace the workflow's; permissions declared nowhere are the repository's default, which the file cannot show and which never includes `id-token`, so they are reported.
  *
- * `workflow-credentials/tokenless-publish-unprotected`: a job with `id-token: write` that publishes (`npm`, `pnpm` or `yarn npm publish`, `semantic-release`, `changeset publish`, `lerna publish`) and passes no token must blank `NODE_AUTH_TOKEN` and `NPM_TOKEN` (set them to `''` at step, job or workflow level) or request provenance (`--provenance` or `NPM_CONFIG_PROVENANCE: true`). The npm CLI replaces any configured token with the one from the OIDC exchange, but when the exchange fails it falls back to whatever token the environment holds, silently.
+ * `workflow-credentials/tokenless-publish-unprotected`: a job with `id-token: write` that publishes (`npm`, `pnpm` or `yarn npm publish`, `semantic-release`, `changeset publish`, `lerna publish`) and passes no token must blank `NODE_AUTH_TOKEN` and `NPM_TOKEN` (set them to `''` at step, job or workflow level) or request provenance (`--provenance`, `NPM_CONFIG_PROVENANCE: true`, or `publishConfig.provenance: true` in the `package.json` of the working directory). The npm CLI replaces any configured token with the one from the OIDC exchange, but when the exchange fails it falls back to whatever token the environment holds, silently.
  *
- * Limits: `registry-url` is not reported, because it does not stop the exchange (see the README); a job that calls a reusable workflow is not read; a publish inside a script file or composite action is not seen; provenance set in `package.json` (`publishConfig.provenance`) is not read, so such a job blanks the variables to pass; a job is tokenless only when no token variable is non-empty anywhere in the job, so a publish that uses a secret is left alone.
+ * Limits: `registry-url` is not reported, because it does not stop the exchange (see the README); a job that calls a reusable workflow is not read; a publish inside a script file or composite action is not seen; provenance set in a `package.json` other than the one in the working directory is not read; a job is tokenless only when no token variable is non-empty anywhere in the job, so a publish that uses a secret is left alone.
  */
-export const workflowCredentials: CheckFunction<WorkflowCredentialsOptions> = async ({ cwd, options }) =>
-  (await loadWorkflows(cwd, options)).flatMap((workflow) => workflow.jobs.flatMap((job) => [...attestationViolations(workflow, job), ...tokenlessPublishViolations(workflow, job)]));
+export const workflowCredentials: CheckFunction<WorkflowCredentialsOptions> = async ({ cwd, options }) => {
+  const provenanceInManifest = await requestsProvenance(cwd);
+
+  return (await loadWorkflows(cwd, options)).flatMap((workflow) => workflow.jobs.flatMap((job) => [...attestationViolations(workflow, job), ...tokenlessPublishViolations(workflow, job, provenanceInManifest)]));
+};
