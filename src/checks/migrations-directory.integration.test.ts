@@ -179,11 +179,13 @@ describe('migrations-directory with config files that are missing or unreadable'
 
   it('fails on a config whose shape it cannot read', async () => {
     const out = await workspace({ 'drizzle.config.ts': 'export default { out: 3 };\n', 'wrangler.json': wranglerJson([{ binding: 'DB' }]) });
+    const emptyOut = await workspace({ 'drizzle.config.ts': "export default { out: '' };\n", 'wrangler.json': wranglerJson([{ binding: 'DB' }]) });
     const databases = await workspace({ 'drizzle.config.ts': drizzle('drizzle'), 'wrangler.json': '{ "d1_databases": "DB" }' });
     const directory = await workspace({ 'drizzle.config.ts': drizzle('drizzle'), 'wrangler.json': '{ "d1_databases": [{ "binding": "DB", "migrations_dir": 3 }] }' });
     const notAnObject = await workspace({ 'drizzle.config.ts': 'export default 3;\n', 'wrangler.json': wranglerJson([{ binding: 'DB' }]) });
 
     await expect(migrationsDirectory({ cwd: out, options })).rejects.toThrow("drizzle.config.ts: 'out' must be a string");
+    await expect(migrationsDirectory({ cwd: emptyOut, options })).rejects.toThrow("drizzle.config.ts: 'out' must not be empty");
     await expect(migrationsDirectory({ cwd: databases, options })).rejects.toThrow("'d1_databases' must be an array of objects");
     await expect(migrationsDirectory({ cwd: directory, options })).rejects.toThrow("'migrations_dir' must be a string");
     await expect(migrationsDirectory({ cwd: notAnObject, options })).rejects.toThrow('the config must be an object');

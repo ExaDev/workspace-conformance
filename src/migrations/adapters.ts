@@ -83,7 +83,7 @@ function recordOf(config: unknown, file: string): Readonly<Record<string, unknow
 const DRIZZLE_DEFAULT_OUT = 'drizzle';
 
 /**
- * drizzle-kit: `out` of `drizzle.config.{ts,js,json}`, `drizzle` when unset. Migrations are applied with `drizzle-kit migrate`; `push` writes no migration files and is not an apply command here.
+ * drizzle-kit: `out` of `drizzle.config.{ts,js,json}`, `drizzle` when unset. An empty `out` is a configuration error, not the default. Migrations are applied with `drizzle-kit migrate`; `push` writes no migration files and is not an apply command here.
  */
 const drizzleKit: GeneratorAdapter = {
   configFiles: ['drizzle.config.ts', 'drizzle.config.js', 'drizzle.config.json'],
@@ -96,6 +96,9 @@ const drizzleKit: GeneratorAdapter = {
     }
     if (typeof out !== 'string') {
       throw new ConformanceError(`${file}: 'out' must be a string`);
+    }
+    if (out === '') {
+      throw new ConformanceError(`${file}: 'out' must not be empty: drizzle-kit reads an empty 'out' as unset in some commands, so the directory it names is ambiguous`);
     }
 
     return out;
