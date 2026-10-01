@@ -403,6 +403,22 @@ jobs:
     expect(where(await workflowCredentials({ cwd, options: {} }))).toEqual([`workflow-credentials/tokenless-publish-unprotected ${CI}:8`]);
   });
 
+  it('reads a publish with package manager options before the subcommand, as a workspace publish is written', async () => {
+    const cwd = await makeTempDir();
+    const publish = (command: string): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${command}\n`;
+    const publishes = ['pnpm publish -r', 'pnpm -r publish', 'pnpm --filter example-package publish', 'pnpm --filter=example-package publish', 'npm -w packages/example publish'];
+    const notPublishes = ['pnpm -r exec echo publish'];
+    const reported: string[] = [];
+    for (const command of [...publishes, ...notPublishes]) {
+      await writeFiles(cwd, { [CI]: publish(command) });
+      if ((await workflowCredentials({ cwd, options: {} })).length > 0) {
+        reported.push(command);
+      }
+    }
+
+    expect(reported).toEqual(publishes);
+  });
+
   it('reads a publish command only where a command starts, and the permissions a job declares in place of the workflow', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, {
