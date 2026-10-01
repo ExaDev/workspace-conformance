@@ -1,0 +1,1 @@
+export default { dialect: 'sqlite', schema: './src/schema.ts', out: './drizzle' };

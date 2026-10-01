@@ -9,6 +9,7 @@ export { importIsolatedGroups } from './checks/import-isolated-groups';
 export { importRankSkip } from './checks/import-rank-skip';
 export { importUphill } from './checks/import-uphill';
 export { instructionSymlinks } from './checks/instruction-symlinks';
+export { migrationsDirectory } from './checks/migrations-directory';
 export { singleStorybook } from './checks/single-storybook';
 export { type ChecksConfig, type ConformanceConfig, conformanceSchema, conformanceSection } from './config';
 export { ConformanceError } from './errors';
@@ -21,8 +22,19 @@ export type {
   DockerfilePackageManagerOptions,
   ImportGraphOptions,
   InstructionSymlinksOptions,
+  MigrationsDirectoryOptions,
   SingleStorybookOptions,
 } from './options';
+export {
+  type DeployDirectory,
+  type DeploySelector,
+  type DeployToolAdapter,
+  type DeployToolName,
+  type GeneratorAdapter,
+  type GeneratorName,
+  deployTools,
+  generators,
+} from './migrations/adapters';
 export { checkNames, isCheckName, type RegisteredCheck, registry } from './registry';
 export { type CheckResult, EXIT_CODES, runChecks, type RunChecksOptions, type RunResult } from './run-checks';
 export {

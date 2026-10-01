@@ -12,6 +12,7 @@ import { importIsolatedGroups, importIsolatedGroupsSpec } from './checks/import-
 import { importRankSkip, importRankSkipSpec } from './checks/import-rank-skip';
 import { importUphill, importUphillSpec } from './checks/import-uphill';
 import { instructionSymlinks } from './checks/instruction-symlinks';
+import { migrationsDirectory } from './checks/migrations-directory';
 import { singleStorybook } from './checks/single-storybook';
 import type { ChecksConfig } from './config';
 import { ConformanceError } from './errors';
@@ -181,6 +182,12 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: 'A package manager version pinned in a Dockerfile is the version packageManager names',
     select: (checks) => enabledOptions(checks['dockerfile-package-manager']),
     check: dockerfilePackageManager,
+  }),
+  'migrations-directory': plain({
+    name: 'migrations-directory',
+    description: "The directory a schema generator writes migrations to is the one the deploy tool applies them from, and no script applies them with the generator",
+    select: (checks) => enabledOptions(checks['migrations-directory']),
+    check: migrationsDirectory,
   }),
 };
 

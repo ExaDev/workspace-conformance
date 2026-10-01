@@ -1,0 +1,5 @@
+{
+  // The deploy tool applies what the generator writes.
+  "name": "worker",
+  "d1_databases": [{ "binding": "DB", "database_name": "db", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "drizzle" }],
+}

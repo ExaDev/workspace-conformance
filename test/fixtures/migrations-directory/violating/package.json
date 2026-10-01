@@ -1,0 +1,8 @@
+{
+  "name": "migrations-violating",
+  "private": true,
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:apply": "pnpm exec drizzle-kit migrate"
+  }
+}

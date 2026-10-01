@@ -138,7 +138,28 @@ Codes: `command-types/hand-written-interface`, `command-types/hand-written-alias
 
 **`dockerfile-package-manager`** verifies that a package manager version pinned in a Dockerfile is the one `packageManager` names, ignoring a `+sha` suffix on either side. Options: `dockerfiles` (`Dockerfile`, `Dockerfile.*` and `*.Dockerfile` at any depth), `exclude` (globs left out of the search) and `packageJson` (`package.json`). Only pins of the package manager `packageManager` names are compared: `pnpm@12.4.1` on a `RUN` line is compared, `npm@latest` is not. Codes: `dockerfile-package-manager/version-mismatch` (with line and column) and `no-package-manager`. A version that refers to a variable (`pnpm@${PNPM_VERSION}` or `pnpm@$PNPM_VERSION`) is compared with the value an `ARG` or `ENV` earlier in the same file gives it. Limits: it reads `<manager>@<version>` as written on a line that is not a comment; a variable the file gives no value (an `ARG` without a default, whose value the build supplies) or whose value refers to another variable is not compared; the value in effect is the latest one set before the pin, whichever build stage set it; and an unpinned `pnpm@latest` is a mismatch.
 
-Checks that compare a generator's output directory with the migrations directory a deploy tool applies are tool specific and are not built.
+**`migrations-directory`** verifies that the directory a schema generator writes migrations to is the directory the deploy tool applies them from, and that no `package.json` script applies them with the generator in place of the deploy tool. It is tool specific, so the generator and the deploy tool are named in the options, each has an adapter that knows its config file names and where in the config the directory is, and the supported pair is `drizzle-kit` (`out` of `drizzle.config.ts`, `.js` or `.json`, `drizzle` when unset) with `wrangler` (`migrations_dir` of a `d1_databases` entry of `wrangler.json`, `.jsonc` or `.toml`, `migrations` when unset). Both directories are resolved against the directory of the file that sets them, and `..` segments and trailing separators are normalised. Adapters are two small interfaces (`GeneratorAdapter` and `DeployToolAdapter`, with `generators` and `deployTools` as the registries), so another tool is one object and an entry in `generatorNames` or `deployToolNames`.
+
+| Option | Meaning |
+|---|---|
+| `generator` | The generator, `drizzle-kit`. |
+| `deployTool` | The deploy tool, `wrangler`. |
+| `generatorConfig` | The generator's config file. The first of the adapter's default names that exists when omitted. |
+| `deployConfig` | The deploy tool's config file; the defaults are `wrangler.json`, `wrangler.jsonc` and `wrangler.toml`, in the order wrangler prefers them. |
+| `database` | The binding of the D1 database the generator writes for. Required when the deploy config declares more than one. |
+| `environment` | A named wrangler environment to read (`env.<name>`) instead of the top-level settings. |
+| `packageJsons` | Globs of the `package.json` files whose scripts are searched. Every `package.json` at any depth when omitted. |
+
+Codes: `migrations-directory/mismatch` (reported at the generator's config), `migrations-directory/no-database` (the deploy config declares no database, or none with the binding named), `migrations-directory/missing-config`, and `migrations-directory/generator-apply-command` (reported at the script, with its position; a script running `drizzle-kit migrate`, which `drizzle-kit push` and `generate` are not). The generator's TypeScript config is evaluated, so it must be trusted; the deploy config is parsed as data. A config that cannot be read, or a deploy config with several databases and no `database`, fails the run with a configuration error and exit status 2 instead of guessing.
+
+False positives and blind spots:
+
+- One generator and deploy config pair is checked per run. A workspace with several pairs (a package per database) needs the library call once for each, with the pair's `generatorConfig`, `deployConfig` and `database`.
+- Several databases: the generator's output is compared with the one database named by `database`, so the other databases are not checked at all, and the check cannot tell which database a generator config is for without being told.
+- Environments: wrangler does not inherit `d1_databases` into an environment, so each environment has its own `migrations_dir`. Only the top level, or the one `environment`, is compared; a divergence in another environment is not seen.
+- Directory resolution: wrangler resolves `migrations_dir` against the directory of its config file, but drizzle-kit resolves `out` against the directory it is run from. The check assumes drizzle-kit runs from the directory of its config, so a script that runs it from elsewhere (`--config` pointing into another directory) can differ from the answer here.
+- Config variants: only the directory searched is looked at, whereas wrangler also finds a config in a parent directory and follows a redirected config; a repository with both `wrangler.json` and `wrangler.toml` is judged by the first, and a `migrations_pattern` that narrows which files are applied is not read. A generator config that computes `out` from the environment is judged by its value in the process running the check.
+- Scripts: a script is matched by the text of the command, so `drizzle-kit migrate` run against a local database for tests is reported, and a command assembled in a shell variable or run from a file the script calls is not seen. Narrow `packageJsons` to exempt a package.
 
 ## Command line
 
@@ -177,7 +198,7 @@ it('conforms to the workspace layout', async () => {
 });
 ```
 
-Every check is also exported as a function taking `{ cwd, options }` (and `layout` for the import checks): `aggregateMappers`, `commandTypes`, `importUphill`, `importRankSkip`, `importCrossSlice`, `importIsolatedGroups`, `importCycles`, `instructionSymlinks`, `singleStorybook`, `commitTypes` and `dockerfilePackageManager`. These take options and a layout as already validated and do not check them again; go through `runChecks` for validation. A check is a function that returns `Promise<readonly Violation[]>`, where a `Violation` is `{ code, message, file, location? }`.
+Every check is also exported as a function taking `{ cwd, options }` (and `layout` for the import checks): `aggregateMappers`, `commandTypes`, `importUphill`, `importRankSkip`, `importCrossSlice`, `importIsolatedGroups`, `importCycles`, `instructionSymlinks`, `singleStorybook`, `commitTypes`, `dockerfilePackageManager` and `migrationsDirectory`. These take options and a layout as already validated and do not check them again; go through `runChecks` for validation. A check is a function that returns `Promise<readonly Violation[]>`, where a `Violation` is `{ code, message, file, location? }`.
 
 ### Proving a handler map is exhaustive
 
