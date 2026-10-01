@@ -108,6 +108,59 @@ jobs:
     ).toEqual([]);
   });
 
+  it('accepts a junction job that loops over the joined results, and does not require it to wait for jobs that never run for a pull request', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      [CI]: `
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+  required-checks:
+    needs: [test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for result in \${{ join(needs.*.result, ' ') }}; do
+            if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then exit 1; fi
+          done
+  mutation:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+  release:
+    needs: [required-checks]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+  after-mutation:
+    needs: [mutation]
+    runs-on: ubuntu-latest
+`,
+    });
+
+    expect(await workflowJobOrdering({ cwd, options: {} })).toEqual([]);
+  });
+
+  it('still requires the junction job to wait for a job whose if allows pull requests', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      [CI]: `
+on: [push, pull_request]
+jobs:
+  required-checks:
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "\${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" != true
+  e2e:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+`,
+    });
+
+    expect(where(await workflowJobOrdering({ cwd, options: {} }))).toEqual([`workflow-job-ordering/junction-missing-need ${CI}:4`]);
+  });
+
   it('does not judge a role that has no job in the workflow', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, { [CI]: 'on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n' });
@@ -334,6 +387,20 @@ jobs:
     });
 
     expect(await workflowCredentials({ cwd, options: {} })).toEqual([]);
+  });
+
+  it('accepts provenance asked for by the publishConfig of the package.json in the working directory', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      'package.json': '{ "name": "x", "publishConfig": { "provenance": true } }',
+      [CI]: 'on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm publish\n',
+    });
+
+    expect(await workflowCredentials({ cwd, options: {} })).toEqual([]);
+
+    await writeFiles(cwd, { 'package.json': '{ "name": "x", "publishConfig": { "access": "public" } }' });
+
+    expect(where(await workflowCredentials({ cwd, options: {} }))).toEqual([`workflow-credentials/tokenless-publish-unprotected ${CI}:8`]);
   });
 
   it('reads a publish command only where a command starts, and the permissions a job declares in place of the workflow', async () => {
