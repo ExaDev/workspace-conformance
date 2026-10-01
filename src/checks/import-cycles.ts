@@ -4,9 +4,9 @@ import type { LayoutCheckFunction, Violation } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { relativePosix } from '../paths';
-import { type WorkspacePackage, readWorkspacePackages, workspaceRoot } from '../workspace/packages';
+import type { WorkspacePackage } from '../workspace/packages';
 import { cycleRule, unresolvedNameImportRule } from '../workspace/rules';
-import { cruiseViolations, describePackage, packageOfPath } from './import-graph';
+import { describePackage, type ImportCheckSpec, packageOfPath, runImportCheck } from './import-graph';
 
 /**
  * `items` rotated to start at the one with the smallest key, so the same ring found from any of its elements has one form.
@@ -103,45 +103,54 @@ function nameCycles(imports: readonly NameImport[]): ReadonlyMap<string, readonl
 }
 
 /**
+ * How `import-cycles` joins a shared cruise.
+ */
+export const importCyclesSpec: ImportCheckSpec = {
+  name: 'import-cycles',
+  rules: (packages) => {
+    const nameRule = unresolvedNameImportRule(packages);
+
+    return nameRule === undefined ? [cycleRule()] : [cycleRule(), nameRule];
+  },
+  report: (found, { cwd, root, packages }) => {
+    const nameRule = unresolvedNameImportRule(packages);
+    const inFiles = fileCycles(found.filter((finding) => finding.rule.name === cycleRule().name));
+    const imports = found
+      .filter((finding) => finding.rule.name === nameRule?.name)
+      .map((finding): NameImport => ({ from: packageOfPath(packages, finding.from), to: packageOfPath(packages, finding.to), file: finding.from }));
+    const inPackages = nameCycles(imports);
+
+    const violations = [
+      ...[...inFiles.values()].map((ordered): Violation => {
+        const [first] = ordered;
+        if (first === undefined) {
+          throw new ConformanceError('an import cycle with no files was reported');
+        }
+
+        return { code: 'import-cycles/cycle', message: `import cycle: ${[...ordered, first].join(' -> ')}`, file: relativePosix(cwd, join(root, first)) };
+      }),
+      ...[...inPackages.values()].map((ring): Violation => {
+        const [first] = ring;
+        if (first === undefined) {
+          throw new ConformanceError('an import cycle with no packages was reported');
+        }
+        const names = [...ring.map((edge) => describePackage(edge.from)), describePackage(first.from)];
+
+        return {
+          code: 'import-cycles/cycle',
+          message: `import cycle between packages that import each other by a name that resolves to no file: ${names.join(' -> ')}`,
+          file: relativePosix(cwd, join(root, first.file)),
+        };
+      }),
+    ];
+
+    return violations.sort((a, b) => a.file.localeCompare(b.file) || a.message.localeCompare(b.message));
+  },
+};
+
+/**
  * Files of the workspace's packages import each other in a cycle, and so do packages that import each other by a name that resolves to no file. Each cycle is reported once, at its first file (or, for packages, the file of the first import), starting from its smallest path.
  *
  * Cycles among packages are found only when every import in the ring is by a name that resolves to no file. A ring that mixes such imports with imports that do resolve to files has no complete path through either graph and is not seen.
  */
-export const importCycles: LayoutCheckFunction<ImportGraphOptions> = async (context) => {
-  const root = workspaceRoot(context.cwd, context.layout);
-  const packages = await readWorkspacePackages(context.cwd, context.layout);
-  const nameRule = unresolvedNameImportRule(packages);
-  const found = await cruiseViolations({ cwd: context.cwd, root, packages, rules: nameRule === undefined ? [cycleRule()] : [cycleRule(), nameRule], options: context.options });
-
-  const inFiles = fileCycles(found.filter((finding) => finding.rule.name === cycleRule().name));
-  const imports = found
-    .filter((finding) => finding.rule.name === nameRule?.name)
-    .map((finding): NameImport => ({ from: packageOfPath(packages, finding.from), to: packageOfPath(packages, finding.to), file: finding.from }));
-  const inPackages = nameCycles(imports);
-
-  const violations = [
-    ...[...inFiles.values()].map((ordered): Violation => {
-      const [first] = ordered;
-      if (first === undefined) {
-        throw new ConformanceError('an import cycle with no files was reported');
-      }
-
-      return { code: 'import-cycles/cycle', message: `import cycle: ${[...ordered, first].join(' -> ')}`, file: relativePosix(context.cwd, join(root, first)) };
-    }),
-    ...[...inPackages.values()].map((ring): Violation => {
-      const [first] = ring;
-      if (first === undefined) {
-        throw new ConformanceError('an import cycle with no packages was reported');
-      }
-      const names = [...ring.map((edge) => describePackage(edge.from)), describePackage(first.from)];
-
-      return {
-        code: 'import-cycles/cycle',
-        message: `import cycle between packages that import each other by a name that resolves to no file: ${names.join(' -> ')}`,
-        file: relativePosix(context.cwd, join(root, first.file)),
-      };
-    }),
-  ];
-
-  return violations.sort((a, b) => a.file.localeCompare(b.file) || a.message.localeCompare(b.message));
-};
+export const importCycles: LayoutCheckFunction<ImportGraphOptions> = async (context) => runImportCheck(context, importCyclesSpec);

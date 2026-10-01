@@ -81,8 +81,8 @@
     "url": "git+https://github.com/ExaDev/workspace-conformance.git"
   },
   "scripts": {
-    "build": "tsdown",
     "bench": "vitest bench --run",
+    "build": "tsdown",
     "lint": "eslint . --fix --cache --max-warnings 0",
     "lint:check": "eslint . --cache --max-warnings 0",
     "prepare": "husky",

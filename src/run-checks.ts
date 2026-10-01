@@ -2,7 +2,8 @@ import { type ConfigFileOptions, type LayoutConfig, layoutSection, loadSection }
 import { validateStandard } from 'cosmiconfig-extends';
 
 import type { Violation } from './check';
-import { type ConformanceConfig, conformanceSection } from './config';
+import { type ImportCheckEntry, runImportChecks } from './checks/import-graph';
+import { type ChecksConfig, type ConformanceConfig, conformanceSection } from './config';
 import { ConformanceError } from './errors';
 import type { CheckName } from './options';
 import { checkNames, registry } from './registry';
@@ -109,6 +110,31 @@ function selected(config: ConformanceConfig, requested: readonly CheckName[] | u
 }
 
 /**
+ * Run the import checks among `names` together, so checks with the same graph options share one cruise. The result has an entry for each of them and none for the other checks.
+ */
+async function runImportGraphChecks(
+  cwd: string,
+  layout: LayoutConfig | undefined,
+  names: readonly CheckName[],
+  checks: ChecksConfig,
+): Promise<ReadonlyMap<string, readonly Violation[]>> {
+  const entries = names.flatMap((name): readonly ImportCheckEntry[] => {
+    const importGraph = registry[name].importGraph;
+    const options = importGraph?.optionsOf(checks);
+
+    return importGraph === undefined || options === undefined ? [] : [{ spec: importGraph.spec, options }];
+  });
+  if (entries.length === 0) {
+    return new Map();
+  }
+  if (layout === undefined) {
+    throw new ConformanceError(`${entries.map((entry) => entry.spec.name).join(', ')} read the workspace layout, which was not supplied`);
+  }
+
+  return runImportChecks({ cwd, layout, entries });
+}
+
+/**
  * Run the enabled checks, or the enabled ones among `checks`, and return what they found. Sections not supplied in the options are loaded from `cwd` with `@exadev/config`.
  *
  * Violations do not throw. It throws `ConformanceError` when the checks cannot run (nothing enabled, a requested check disabled, a section missing) and `ConfigValidationError` when a section fails its schema, whether it was loaded from `cwd` or passed in.
@@ -121,9 +147,13 @@ export async function runChecks(options: RunChecksOptions): Promise<RunResult> {
     names.filter((name) => registry[name].requiresLayout),
   );
 
+  const imported = await runImportGraphChecks(options.cwd, layout, names, config.checks);
+
   const results: CheckResult[] = [];
   for (const name of names) {
-    results.push({ check: name, violations: await registry[name].run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles }) });
+    const shared = imported.get(name);
+    const violations = shared ?? (await registry[name].run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles }));
+    results.push({ check: name, violations });
   }
   const violations = results.flatMap((result) => result.violations);
 
