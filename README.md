@@ -237,6 +237,7 @@ pnpm lint:check      # eslint, check only; what CI runs
 pnpm typecheck
 pnpm test            # vitest, with coverage
 pnpm build           # tsdown: ESM, CJS and declarations, plus the bin
+pnpm bench           # vitest bench of the import checks on a generated workspace; CI does not run it
 pnpm test:mutation   # Stryker; CI runs it on manual dispatch only
 ```
 
