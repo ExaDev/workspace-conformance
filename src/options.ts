@@ -1,3 +1,5 @@
+import type { DeployToolName, GeneratorName } from './migrations/adapters';
+
 /**
  * Options of the `aggregate-mappers` check: every aggregate type a contract exports has a mapper file in the place the template names.
  */
@@ -129,6 +131,40 @@ export interface DockerfilePackageManagerOptions {
 }
 
 /**
+ * Options of the `migrations-directory` check: the directory a schema generator writes migrations to is the one the deploy tool applies them from, and no script applies them with the generator.
+ */
+export interface MigrationsDirectoryOptions {
+  /**
+   * The schema generator, which has an adapter that knows its config file and where in it the output directory is.
+   */
+  readonly generator: GeneratorName;
+  /**
+   * The deploy tool, which has an adapter that knows its config file and where in it the migrations directory is.
+   */
+  readonly deployTool: DeployToolName;
+  /**
+   * The generator's config file, relative to the directory the checks run in. The first of the adapter's default file names that exists when omitted.
+   */
+  readonly generatorConfig?: string;
+  /**
+   * The deploy tool's config file. The first of the adapter's default file names that exists when omitted.
+   */
+  readonly deployConfig?: string;
+  /**
+   * The binding of the database the generator writes migrations for. Needed when the deploy config declares more than one; the only one is used when omitted.
+   */
+  readonly database?: string;
+  /**
+   * The named environment of the deploy config to read instead of its top-level settings.
+   */
+  readonly environment?: string;
+  /**
+   * Globs of the `package.json` files whose scripts are searched for the generator's apply command. Every `package.json` at any depth when omitted.
+   */
+  readonly packageJsons?: readonly string[];
+}
+
+/**
  * The options of every check, by check name.
  */
 export interface CheckOptionsByName {
@@ -143,6 +179,7 @@ export interface CheckOptionsByName {
   readonly 'single-storybook': SingleStorybookOptions;
   readonly 'commit-types': CommitTypesOptions;
   readonly 'dockerfile-package-manager': DockerfilePackageManagerOptions;
+  readonly 'migrations-directory': MigrationsDirectoryOptions;
 }
 
 /**

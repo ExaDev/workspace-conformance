@@ -28,6 +28,15 @@ describe('conformanceSchema', () => {
         'single-storybook': { location: '.', exclude: ['test/fixtures/**'] },
         'commit-types': { commitlint: 'c.ts', release: 'r.ts' },
         'dockerfile-package-manager': { dockerfiles: ['Dockerfile'], exclude: ['test/fixtures/**'], packageJson: 'package.json' },
+        'migrations-directory': {
+          generator: 'drizzle-kit',
+          deployTool: 'wrangler',
+          generatorConfig: 'db/drizzle.config.ts',
+          deployConfig: 'db/wrangler.toml',
+          database: 'DB',
+          environment: 'staging',
+          packageJsons: ['package.json'],
+        },
       },
     };
 
@@ -53,6 +62,13 @@ describe('conformanceSchema', () => {
     expect(await issuesOf({ checks: { 'aggregate-mappers': { mapper: 'x' } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'command-types': true } })).toBeDefined();
     expect(await issuesOf({ checks: { 'import-uphill': true } })).toBeDefined();
+  });
+
+  it('rejects a migrations-directory check without both tools, or with one that has no adapter', async () => {
+    expect(await issuesOf({ checks: { 'migrations-directory': {} } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'migrations-directory': { generator: 'drizzle-kit' } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'migrations-directory': { generator: 'prisma', deployTool: 'wrangler' } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'migrations-directory': { generator: 'drizzle-kit', deployTool: 'flyway' } } })).toBeDefined();
   });
 
   it('rejects empty paths, empty lists of globs and options of the wrong type', async () => {

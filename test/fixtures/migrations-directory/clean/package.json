@@ -1,0 +1,8 @@
+{
+  "name": "migrations-clean",
+  "private": true,
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:apply": "wrangler d1 migrations apply DB --remote"
+  }
+}

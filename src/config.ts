@@ -1,6 +1,7 @@
 import { defineSection, type Section } from '@exadev/config';
 import { z } from 'zod';
 
+import { deployToolNames, generatorNames } from './migrations/adapters';
 import type { CheckName, CheckOptionsByName } from './options';
 
 /**
@@ -78,6 +79,19 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
   'single-storybook': z.exactOptional(enabled(z.strictObject({ location: z.exactOptional(path), exclude: z.exactOptional(paths) }))),
   'commit-types': z.exactOptional(enabled(z.strictObject({ commitlint: z.exactOptional(path), release: z.exactOptional(path) }))),
   'dockerfile-package-manager': z.exactOptional(enabled(z.strictObject({ dockerfiles: z.exactOptional(paths), exclude: z.exactOptional(paths), packageJson: z.exactOptional(path) }))),
+  'migrations-directory': z.exactOptional(
+    enabled(
+      z.strictObject({
+        generator: z.enum(generatorNames),
+        deployTool: z.enum(deployToolNames),
+        generatorConfig: z.exactOptional(path),
+        deployConfig: z.exactOptional(path),
+        database: z.exactOptional(z.string().min(1)),
+        environment: z.exactOptional(z.string().min(1)),
+        packageJsons: z.exactOptional(paths),
+      }),
+    ),
+  ),
 });
 
 /**
