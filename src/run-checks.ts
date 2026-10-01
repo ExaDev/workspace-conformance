@@ -2,6 +2,7 @@ import { type ConfigFileOptions, type LayoutConfig, layoutSection, loadSection }
 import { validateStandard } from 'cosmiconfig-extends';
 
 import type { Violation } from './check';
+import type { GitHubClient } from './github';
 import { type ImportCheckEntry, runImportChecks } from './checks/import-graph';
 import { type ChecksConfig, type ConformanceConfig, conformanceSection } from './config';
 import { ConformanceError } from './errors';
@@ -37,6 +38,10 @@ export interface RunChecksOptions {
    * How config files are loaded: the sections loaded from `cwd` and the config files a check evaluates itself, such as the commitlint and release configs of `commit-types`. Only `alias` and `fsCache` apply to the latter.
    */
   readonly configFiles?: ConfigFileOptions;
+  /**
+   * The client the settings checks (`settings-*`) read the repository through. They run only when it is given, so a run without it stays offline and needs no token; naming one of them in `checks` without a client is an error.
+   */
+  readonly github?: GitHubClient;
 }
 
 /**
@@ -92,18 +97,26 @@ async function layoutOf(options: RunChecksOptions, needed: readonly CheckName[])
   return loaded;
 }
 
-function selected(config: ConformanceConfig, requested: readonly CheckName[] | undefined): readonly CheckName[] {
+function selected(config: ConformanceConfig, requested: readonly CheckName[] | undefined, online: boolean): readonly CheckName[] {
   const enabled = checkNames.filter((name) => registry[name].isEnabled(config.checks));
   if (requested === undefined) {
     if (enabled.length === 0) {
       throw new ConformanceError("no check is enabled; add one to the 'checks' of the 'conformance' section");
     }
+    const runnable = enabled.filter((name) => online || !registry[name].requiresGitHub);
+    if (runnable.length === 0) {
+      throw new ConformanceError(`only checks that read the repository's settings are enabled (${enabled.join(', ')}); they run only with a GitHub client (--settings on the command line)`);
+    }
 
-    return enabled;
+    return runnable;
   }
   const disabled = requested.filter((name) => !enabled.includes(name));
   if (disabled.length > 0) {
     throw new ConformanceError(`${disabled.join(', ')} ${disabled.length === 1 ? 'is' : 'are'} not enabled in the 'conformance' section`);
+  }
+  const offline = requested.filter((name) => !online && registry[name].requiresGitHub);
+  if (offline.length > 0) {
+    throw new ConformanceError(`${offline.join(', ')} read${offline.length === 1 ? 's' : ''} the repository's settings and need${offline.length === 1 ? 's' : ''} a GitHub client (--settings on the command line)`);
   }
 
   return checkNames.filter((name) => requested.includes(name));
@@ -156,7 +169,7 @@ function readImported(imported: ReadonlyMap<string, readonly Violation[]>, name:
  */
 export async function runChecks(options: RunChecksOptions): Promise<RunResult> {
   const config = await conformanceOf(options);
-  const names = selected(config, options.checks);
+  const names = selected(config, options.checks, options.github !== undefined);
   const layout = await layoutOf(
     options,
     names.filter((name) => registry[name].requiresLayout),
@@ -167,7 +180,7 @@ export async function runChecks(options: RunChecksOptions): Promise<RunResult> {
   const results: CheckResult[] = [];
   for (const name of names) {
     const check: RegisteredCheck<CheckName> = registry[name];
-    const violations = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles }) : readImported(imported, name);
+    const violations = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles, github: options.github }) : readImported(imported, name);
     results.push({ check: name, violations });
   }
   const violations = results.flatMap((result) => result.violations);

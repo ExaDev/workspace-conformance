@@ -1,10 +1,22 @@
 import type { ConfigFileOptions, LayoutConfig } from '@exadev/config';
 
-import type { CheckFunction, Violation } from './check';
+import type { CheckFunction, GitHubCheckFunction, Violation } from './check';
 import { aggregateMappers } from './checks/aggregate-mappers';
 import { commandTypes } from './checks/command-types';
 import { commitTypes } from './checks/commit-types';
 import { dockerfilePackageManager } from './checks/dockerfile-package-manager';
+import { settingsMergeMethods } from './checks/settings-merge-methods';
+import { settingsRequiredChecks } from './checks/settings-required-checks';
+import { settingsReviewThreadResolution } from './checks/settings-review-thread-resolution';
+import { workflowActionPinning } from './checks/workflow-action-pinning';
+import { workflowCredentials } from './checks/workflow-credentials';
+import { workflowJobOrdering } from './checks/workflow-job-ordering';
+import { workflowMergeGroup } from './checks/workflow-merge-group';
+import { workflowRepositoryDispatch } from './checks/workflow-repository-dispatch';
+import { workflowRunnerResolution } from './checks/workflow-runner-resolution';
+import { workflowSkippableJobs } from './checks/workflow-skippable-jobs';
+import { workflowUpdateBotCooldown } from './checks/workflow-update-bot-cooldown';
+import { workflowVersionSingleSource } from './checks/workflow-version-single-source';
 import { importCrossSliceSpec } from './checks/import-cross-slice';
 import { importCyclesSpec } from './checks/import-cycles';
 import type { ImportCheckSpec } from './checks/import-graph';
@@ -16,6 +28,7 @@ import { migrationsDirectory } from './checks/migrations-directory';
 import { singleStorybook } from './checks/single-storybook';
 import type { ChecksConfig } from './config';
 import { ConformanceError } from './errors';
+import type { GitHubClient } from './github';
 import type { CheckName, ImportGraphOptions } from './options';
 
 /**
@@ -26,6 +39,10 @@ export interface RunInput {
   readonly checks: ChecksConfig;
   readonly layout: LayoutConfig | undefined;
   readonly configFiles: ConfigFileOptions | undefined;
+  /**
+   * The client the settings checks read through; `undefined` when the run is offline.
+   */
+  readonly github: GitHubClient | undefined;
 }
 
 /**
@@ -38,6 +55,10 @@ interface RegisteredCheckBase<Name extends CheckName> {
    * Whether the check reads the workspace layout, and so needs the `layout` section.
    */
   readonly requiresLayout: boolean;
+  /**
+   * Whether the check reads the repository's settings through the GitHub API, and so runs only when the run is given a client.
+   */
+  readonly requiresGitHub: boolean;
   /**
    * Whether the `checks` map turns this check on.
    */
@@ -83,6 +104,7 @@ function plain<Name extends CheckName, Options>(spec: {
     name: spec.name,
     description: spec.description,
     requiresLayout: false,
+    requiresGitHub: false,
     isEnabled: (checks) => spec.select(checks) !== undefined,
     run: async ({ cwd, checks, configFiles }) => {
       const options = spec.select(checks);
@@ -91,6 +113,32 @@ function plain<Name extends CheckName, Options>(spec: {
       }
 
       return spec.check({ cwd, options, ...(configFiles === undefined ? {} : { configFiles }) });
+    },
+  };
+}
+
+function online<Name extends CheckName, Options>(spec: {
+  readonly name: Name;
+  readonly description: string;
+  readonly select: (checks: ChecksConfig) => Options | undefined;
+  readonly check: GitHubCheckFunction<Options>;
+}): StandaloneCheck<Name> {
+  return {
+    name: spec.name,
+    description: spec.description,
+    requiresLayout: false,
+    requiresGitHub: true,
+    isEnabled: (checks) => spec.select(checks) !== undefined,
+    run: async ({ cwd, checks, configFiles, github }) => {
+      const options = spec.select(checks);
+      if (options === undefined) {
+        throw new ConformanceError(`the check '${spec.name}' is not enabled`);
+      }
+      if (github === undefined) {
+        throw new ConformanceError(`the check '${spec.name}' reads the repository's settings and needs a GitHub client`);
+      }
+
+      return spec.check({ cwd, options, github, ...(configFiles === undefined ? {} : { configFiles }) });
     },
   };
 }
@@ -105,6 +153,7 @@ function importCheck<Name extends CheckName>(spec: {
     name: spec.name,
     description: spec.description,
     requiresLayout: true,
+    requiresGitHub: false,
     isEnabled: (checks) => spec.select(checks) !== undefined,
     importGraph: { spec: spec.importSpec, optionsOf: spec.select },
   };
@@ -185,6 +234,78 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: "The directory a schema generator writes migrations to is the one the deploy tool applies them from, and no script applies them with the generator",
     select: (checks) => enabledOptions(checks['migrations-directory']),
     check: migrationsDirectory,
+  }),
+  'workflow-job-ordering': plain({
+    name: 'workflow-job-ordering',
+    description: 'Release, deploy and junction jobs are ordered so a failure stops what follows',
+    select: (checks) => enabledOptions(checks['workflow-job-ordering']),
+    check: workflowJobOrdering,
+  }),
+  'workflow-skippable-jobs': plain({
+    name: 'workflow-skippable-jobs',
+    description: 'A path filter does not leave a required check pending or skip a job no junction job reports for',
+    select: (checks) => enabledOptions(checks['workflow-skippable-jobs']),
+    check: workflowSkippableJobs,
+  }),
+  'workflow-runner-resolution': plain({
+    name: 'workflow-runner-resolution',
+    description: 'A self-hosted or custom runner label is resolved once by a resolver job, not repeated in several jobs',
+    select: (checks) => enabledOptions(checks['workflow-runner-resolution']),
+    check: workflowRunnerResolution,
+  }),
+  'workflow-version-single-source': plain({
+    name: 'workflow-version-single-source',
+    description: 'Setup steps read a runtime version from .nvmrc or .tool-versions instead of holding a literal',
+    select: (checks) => enabledOptions(checks['workflow-version-single-source']),
+    check: workflowVersionSingleSource,
+  }),
+  'workflow-credentials': plain({
+    name: 'workflow-credentials',
+    description: 'Attestation steps have the permissions they need, and a tokenless publish cannot quietly use a token',
+    select: (checks) => enabledOptions(checks['workflow-credentials']),
+    check: workflowCredentials,
+  }),
+  'workflow-repository-dispatch': plain({
+    name: 'workflow-repository-dispatch',
+    description: 'A repository_dispatch handler does not push to the default branch, auto-merge unguarded, or rely on the default token',
+    select: (checks) => enabledOptions(checks['workflow-repository-dispatch']),
+    check: workflowRepositoryDispatch,
+  }),
+  'workflow-update-bot-cooldown': plain({
+    name: 'workflow-update-bot-cooldown',
+    description: 'Dependabot and Renovate wait before proposing a new release',
+    select: (checks) => enabledOptions(checks['workflow-update-bot-cooldown']),
+    check: workflowUpdateBotCooldown,
+  }),
+  'workflow-merge-group': plain({
+    name: 'workflow-merge-group',
+    description: 'A workflow that runs for pull requests also runs for the merge queue',
+    select: (checks) => enabledOptions(checks['workflow-merge-group']),
+    check: workflowMergeGroup,
+  }),
+  'workflow-action-pinning': plain({
+    name: 'workflow-action-pinning',
+    description: 'Actions and reusable workflows are pinned as the configured policy requires',
+    select: (checks) => enabledOptions(checks['workflow-action-pinning']),
+    check: workflowActionPinning,
+  }),
+  'settings-merge-methods': online({
+    name: 'settings-merge-methods',
+    description: 'The repository allows only one merge method',
+    select: (checks) => enabledOptions(checks['settings-merge-methods']),
+    check: settingsMergeMethods,
+  }),
+  'settings-required-checks': online({
+    name: 'settings-required-checks',
+    description: 'The default branch requires the junction job check, up to date with the base',
+    select: (checks) => enabledOptions(checks['settings-required-checks']),
+    check: settingsRequiredChecks,
+  }),
+  'settings-review-thread-resolution': online({
+    name: 'settings-review-thread-resolution',
+    description: 'A pull request cannot merge while a review conversation is unresolved',
+    select: (checks) => enabledOptions(checks['settings-review-thread-resolution']),
+    check: settingsReviewThreadResolution,
   }),
 };
 

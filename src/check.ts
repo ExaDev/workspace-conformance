@@ -1,5 +1,7 @@
 import type { ConfigFileOptions, LayoutConfig } from '@exadev/config';
 
+import type { GitHubClient } from './github';
+
 /**
  * A position in a file, both numbers counted from 1.
  */
@@ -55,3 +57,15 @@ export type CheckFunction<Options> = (context: CheckContext<Options>) => Promise
  * A check that also needs the resolved workspace layout.
  */
 export type LayoutCheckFunction<Options> = (context: LayoutCheckContext<Options>) => Promise<readonly Violation[]>;
+
+/**
+ * What a check that reads repository settings through the GitHub API receives.
+ */
+export interface GitHubCheckContext<Options> extends CheckContext<Options> {
+  readonly github: GitHubClient;
+}
+
+/**
+ * A check that reads repository settings through the GitHub API. Its violations name the repository (`owner/name`) as the file.
+ */
+export type GitHubCheckFunction<Options> = (context: GitHubCheckContext<Options>) => Promise<readonly Violation[]>;

@@ -1,0 +1,37 @@
+name: Update
+on:
+  repository_dispatch:
+    types: [update]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  push-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git commit -am update
+          git push origin HEAD:main
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr merge 1 --auto --rebase
+        env:
+          GH_TOKEN: ${{ secrets.APP_TOKEN }}
+  default-token-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git checkout -b update
+          git push origin update
+          gh pr create --fill
+        env:
+          GH_TOKEN: ${{ github.token }}
+  dispatch-elsewhere:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh api repos/example-org/other-repo/dispatches -f event_type=update
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

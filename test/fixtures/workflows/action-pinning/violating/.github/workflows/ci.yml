@@ -1,0 +1,14 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/local
+      - uses: actions/checkout@v4
+      - uses: third-party/action@main
+      - uses: docker://alpine:3.20
+      - uses: third-party/no-ref
+      - uses: example-org/shared/.github/actions/setup@v1
+  reusable:
+    uses: example-org/shared/.github/workflows/build.yml@v1

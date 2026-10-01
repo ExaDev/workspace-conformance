@@ -37,3 +37,10 @@ export async function createGitWorkspace(entries: Readonly<Record<string, GitEnt
 
   return directory;
 }
+
+/**
+ * Add a remote to a repository made by {@link createGitWorkspace}.
+ */
+export function addRemote(directory: string, name: string, url: string): void {
+  git(directory, ['remote', 'add', name, url]);
+}

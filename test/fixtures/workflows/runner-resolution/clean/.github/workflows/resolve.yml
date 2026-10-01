@@ -1,0 +1,16 @@
+name: Resolve runner
+on:
+  workflow_call:
+    outputs:
+      runner:
+        description: Runner labels as JSON
+        value: ${{ jobs.pick.outputs.runner }}
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      runner: ${{ steps.choose.outputs.runner || '["ubuntu-latest"]' }}
+    steps:
+      - id: choose
+        run: echo 'runner=["fleet"]' >> "$GITHUB_OUTPUT"

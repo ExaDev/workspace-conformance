@@ -1,0 +1,29 @@
+name: CI
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+  docs:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo docs
+  required-checks:
+    needs: [changes]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo done

@@ -45,3 +45,15 @@ export async function indexEntry(cwd: string, path: string): Promise<IndexEntry 
 export async function blobContent(cwd: string, blob: string): Promise<string> {
   return git(cwd, ['cat-file', 'blob', blob]);
 }
+
+/**
+ * The URL of the remote `name` as configured, before any `url.<base>.insteadOf` rewriting (which `git remote get-url` applies and which can turn a GitHub address into a host alias), or `undefined` when the working tree has no such remote.
+ */
+export async function remoteUrl(cwd: string, name: string): Promise<string | undefined> {
+  const remotes = (await git(cwd, ['remote'])).split('\n');
+  if (!remotes.includes(name)) {
+    return undefined;
+  }
+
+  return (await git(cwd, ['config', '--get', `remote.${name}.url`])).trim();
+}
