@@ -33,17 +33,58 @@ function isDefaultBranch(branch: string, branches: readonly string[]): boolean {
 }
 
 /**
- * Whether a `git push` command line pushes to the default branch. With a refspec it is the destination; without one it is the branch the handler has checked out, which is the default branch unless the job created another or checked one out by `ref`.
+ * The `git push` options that take their value as the next word, which would otherwise be read as the remote.
+ */
+const PUSH_OPTIONS_WITH_VALUE: ReadonlySet<string> = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);
+
+/**
+ * A URL with credentials in it (an expression such as `${{ secrets.TOKEN }}` may be part of them), which authenticates a push itself instead of using what the checkout left in git config.
+ */
+const URL_WITH_CREDENTIALS = /[a-z][a-z0-9+.-]*:\/\/(?:[^\s/@{]|\$\{\{[^}]*\}\})*@/iu;
+
+/**
+ * The refspecs of a `git push` command line, after the remote, the options and the values of the options that take one.
+ */
+function pushRefspecs(line: string): readonly string[] {
+  const words = (PUSH.exec(line)?.[1] ?? '').split(/\s+/u).filter((word) => word !== '');
+  const positional: string[] = [];
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index];
+    if (word === undefined) {
+      continue;
+    }
+    if (PUSH_OPTIONS_WITH_VALUE.has(word)) {
+      index += 1;
+    } else if (!word.startsWith('-')) {
+      positional.push(word);
+    }
+  }
+
+  return positional.slice(1);
+}
+
+/**
+ * Whether a `git push` command line pushes to the default branch. With a refspec it is the destination (a leading `+` only forces the update, and a bare `HEAD` is the checked-out branch); without one it is the branch the handler has checked out, which is the default branch unless the job created another or checked one out by `ref`.
  */
 function pushesToDefault(line: string, onOtherBranch: boolean, branches: readonly string[]): boolean {
-  const positional = (PUSH.exec(line)?.[1] ?? '').split(/\s+/u).filter((word) => word !== '' && !word.startsWith('-'));
-  const refspec = positional[1];
-  if (refspec === undefined) {
+  const refspecs = pushRefspecs(line);
+  if (refspecs.length === 0) {
     return !onOtherBranch;
   }
-  const destination = refspec.includes(':') ? refspec.slice(refspec.lastIndexOf(':') + 1) : refspec;
 
-  return isDefaultBranch(destination, branches);
+  return refspecs.some((refspec) => {
+    const destination = refspec.replace(/^\+/u, '');
+    const named = destination.includes(':') ? destination.slice(destination.lastIndexOf(':') + 1) : destination;
+
+    return named === 'HEAD' ? !onOtherBranch : isDefaultBranch(named, branches);
+  });
+}
+
+/**
+ * Whether a `git push` command line authenticates with what the checkout left in git config, which it does unless the command line names a URL carrying its own credentials.
+ */
+function pushesWithGitConfig(line: string): boolean {
+  return !URL_WITH_CREDENTIALS.test(line);
 }
 
 function usesDefaultToken(workflow: Workflow, job: Job, step: Step): boolean {
@@ -79,7 +120,7 @@ function stepViolations(context: Context, step: Step, onOtherBranch: boolean): r
   if (!context.assumeRequiredChecks && lines.some((line) => AUTO_MERGE.test(line))) {
     report('auto-merge-without-required-checks', `job '${job.id}' merges with --auto, which merges at once when the base branch has no required checks; require status checks on the default branch (or set assumeRequiredChecks once it does)`);
   }
-  const pushesAsDefaultToken = (pushes.length > 0 || autoCommits) && checkoutKeepsDefaultToken(job);
+  const pushesAsDefaultToken = (pushes.some(pushesWithGitConfig) || autoCommits) && checkoutKeepsDefaultToken(job);
   const createsPullRequestAsDefaultToken =
     (lines.some((line) => PULL_REQUEST_CREATION.test(line)) && usesDefaultToken(workflow, job, step)) ||
     (stepUses(step, PULL_REQUEST_ACTION) && (step.with['token'] === undefined || DEFAULT_TOKEN.test(step.with['token'])));
@@ -113,7 +154,7 @@ function jobViolations(context: Context): readonly Violation[] {
 /**
  * A workflow that handles `repository_dispatch` can be started by anyone with write access through the API, so what it does with the repository is held to a higher bar.
  *
- * `workflow-repository-dispatch/pushes-default-branch`: a `git push` to the default branch, or one with no refspec while the default branch is checked out, or `git-auto-commit-action` on it. `auto-merge-without-required-checks`: `gh pr merge --auto`, which merges at once when the base branch requires no checks (the file cannot show the rule; `assumeRequiredChecks` states it, and `settings-required-checks` verifies it). `default-token-triggers-nothing`: a push (the checkout leaves `GITHUB_TOKEN` in git config unless it is given a `token`) or a pull request opened as `GITHUB_TOKEN`; events created with it start no workflows, apart from `workflow_dispatch` and `repository_dispatch`, so the pushed commit gets no checks. `dispatch-other-repository-with-default-token`: a dispatch to a repository other than `github.repository` with `GITHUB_TOKEN`, whose access is limited to its own repository. Dispatching in the same repository with `GITHUB_TOKEN` is allowed by GitHub and is not reported.
+ * `workflow-repository-dispatch/pushes-default-branch`: a `git push` to the default branch, or one with no refspec while the default branch is checked out, or `git-auto-commit-action` on it. `auto-merge-without-required-checks`: `gh pr merge --auto`, which merges at once when the base branch requires no checks (the file cannot show the rule; `assumeRequiredChecks` states it, and `settings-required-checks` verifies it). `default-token-triggers-nothing`: a push (the checkout leaves `GITHUB_TOKEN` in git config unless it is given a `token`, and a push to a URL carrying its own credentials does not use it) or a pull request opened as `GITHUB_TOKEN`; events created with it start no workflows, apart from `workflow_dispatch` and `repository_dispatch`, so the pushed commit gets no checks. `dispatch-other-repository-with-default-token`: a dispatch to a repository other than `github.repository` with `GITHUB_TOKEN`, whose access is limited to its own repository. Dispatching in the same repository with `GITHUB_TOKEN` is allowed by GitHub and is not reported.
  *
  * Limits: commands are read as text, so a script file or composite action is not seen; a push is judged by its command line, so a branch created by a helper is not seen; a dispatch target written literally as this repository's own name is reported, since the file does not know the name; a job that calls a reusable workflow is not read.
  */

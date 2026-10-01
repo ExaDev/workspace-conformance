@@ -524,6 +524,36 @@ jobs:
     ]);
   });
 
+  it('reads the destination of a push through HEAD, a forcing +, and options that take a value', async () => {
+    const cwd = await makeTempDir();
+    const job = (name: string, command: string): string => `
+  ${name}:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: \${{ secrets.APP_TOKEN }}
+      - run: ${command}`;
+    await writeFiles(cwd, {
+      [CI]: `on: repository_dispatch\njobs:${[
+        job('head', 'git push origin HEAD'),
+        job('forced', 'git push origin +main'),
+        job('forced-head', 'git push --force origin +HEAD:main'),
+        job('option-value', 'git push -o ci.skip origin main'),
+        job('other-branch', 'git push -o ci.skip origin update'),
+        job('head-to-branch', 'git push origin HEAD:update'),
+        job('option-value-after-refspec', 'git push origin update -o main'),
+      ].join('')}\n`,
+    });
+
+    expect(where(await workflowRepositoryDispatch({ cwd, options: {} }))).toEqual([
+      `workflow-repository-dispatch/pushes-default-branch ${CI}:9`,
+      `workflow-repository-dispatch/pushes-default-branch ${CI}:16`,
+      `workflow-repository-dispatch/pushes-default-branch ${CI}:23`,
+      `workflow-repository-dispatch/pushes-default-branch ${CI}:30`,
+    ]);
+  });
+
   it('reports a pull request opened by an action with the default token, and a dispatch action aimed at another repository', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, {
