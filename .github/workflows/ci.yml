@@ -188,7 +188,7 @@ jobs:
         with:
           node-version: '22'
           cache: pnpm
-          # registry-url is deliberately absent: setup-node would otherwise write an .npmrc _authToken line that wins over the OIDC token exchange, breaking trusted publishing.
+          # registry-url is deliberately absent: trusted publishing needs no registry configuration, and without it setup-node writes no .npmrc with an _authToken line that could carry a stale token if the OIDC exchange fails. (A successful exchange overrides that line, so keeping registry-url would not break publishing.)
       - run: pnpm install --frozen-lockfile
       - name: Upgrade npm for OIDC trusted publishing (needs npm CLI >=11.5.1)
         run: npm install -g npm@latest
