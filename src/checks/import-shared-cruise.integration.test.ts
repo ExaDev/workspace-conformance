@@ -1,3 +1,4 @@
+import type { LayoutConfig } from '@exadev/config';
 import type * as dependencyCruiser from 'dependency-cruiser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -134,6 +135,22 @@ describe('runImportChecks guarding the split of findings', () => {
 
     await expect(run).rejects.toThrow(ConformanceError);
     await expect(run).rejects.toThrow("the checks first and second both generate a rule named 'same'");
+  });
+
+  it('allows one check to repeat a rule name, since all its findings are its own', async () => {
+    const twice: ImportCheckSpec = { ...named('first', 'same'), rules: (...args) => [...named('first', 'same').rules(...args), ...named('first', 'same').rules(...args)] };
+
+    expect([...(await runImportChecks({ cwd: violating, layout: importsLayout, entries: [{ spec: twice, options: {} }] })).keys()]).toEqual(['first']);
+  });
+
+  it('reports a layout that lists an isolated pair twice or in both orders as it does a single listing', async () => {
+    const once = await importIsolatedGroups({ cwd: violating, layout: importsLayout, options: {} });
+    const duplicated: LayoutConfig = { ...importsLayout, isolatedGroups: [['core', 'product'], ['product', 'core'], ['core', 'product']] };
+
+    const result = await importIsolatedGroups({ cwd: violating, layout: duplicated, options: {} });
+
+    expect(result.length).toBeGreaterThan(0);
+    expect(result).toEqual(once);
   });
 
   it('allows the same rule name in checks that do not share a cruise', async () => {
