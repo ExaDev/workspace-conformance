@@ -82,6 +82,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "bench": "vitest bench --run",
     "lint": "eslint . --fix --cache --max-warnings 0",
     "lint:check": "eslint . --cache --max-warnings 0",
     "prepare": "husky",
