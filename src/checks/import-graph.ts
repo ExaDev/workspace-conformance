@@ -192,7 +192,7 @@ export async function runImportChecks(input: {
     for (const member of members) {
       for (const rule of member.rules) {
         const existing = owner.get(rule.name);
-        if (existing !== undefined) {
+        if (existing !== undefined && existing !== member.spec.name) {
           throw new ConformanceError(`the checks ${existing} and ${member.spec.name} both generate a rule named '${rule.name}', so their findings cannot be told apart`);
         }
         owner.set(rule.name, member.spec.name);
