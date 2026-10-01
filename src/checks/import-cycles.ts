@@ -5,7 +5,7 @@ import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { relativePosix } from '../paths';
 import type { WorkspacePackage } from '../workspace/packages';
-import { cycleRule, unresolvedNameImportRule } from '../workspace/rules';
+import { CYCLE_RULE_NAME, cycleRule, UNRESOLVED_NAME_IMPORT_RULE_NAME, unresolvedNameImportRule } from '../workspace/rules';
 import { describePackage, type ImportCheckSpec, packageOfPath, runImportCheck } from './import-graph';
 
 /**
@@ -113,10 +113,9 @@ export const importCyclesSpec: ImportCheckSpec = {
     return nameRule === undefined ? [cycleRule()] : [cycleRule(), nameRule];
   },
   report: (found, { cwd, root, packages }) => {
-    const nameRule = unresolvedNameImportRule(packages);
-    const inFiles = fileCycles(found.filter((finding) => finding.rule.name === cycleRule().name));
+    const inFiles = fileCycles(found.filter((finding) => finding.rule.name === CYCLE_RULE_NAME));
     const imports = found
-      .filter((finding) => finding.rule.name === nameRule?.name)
+      .filter((finding) => finding.rule.name === UNRESOLVED_NAME_IMPORT_RULE_NAME)
       .map((finding): NameImport => ({ from: packageOfPath(packages, finding.from), to: packageOfPath(packages, finding.to), file: finding.from }));
     const inPackages = nameCycles(imports);
 

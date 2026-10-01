@@ -156,10 +156,20 @@ export function isolatedGroupRules(packages: readonly WorkspacePackage[], isolat
 }
 
 /**
+ * The name of {@link cycleRule}, which a check reads its findings by.
+ */
+export const CYCLE_RULE_NAME = 'import-cycle';
+
+/**
+ * The name of {@link unresolvedNameImportRule}, which a check reads its findings by.
+ */
+export const UNRESOLVED_NAME_IMPORT_RULE_NAME = 'unresolved-name-import';
+
+/**
  * The rule that forbids any import cycle among the packages' files.
  */
 export function cycleRule(): ImportRule {
-  return { name: 'import-cycle', severity: 'error', comment: 'files may not import each other in a cycle', from: {}, to: { circular: true } };
+  return { name: CYCLE_RULE_NAME, severity: 'error', comment: 'files may not import each other in a cycle', from: {}, to: { circular: true } };
 }
 
 /**
@@ -173,7 +183,7 @@ export function unresolvedNameImportRule(packages: readonly WorkspacePackage[]):
   return names === undefined
     ? undefined
     : {
-        name: 'unresolved-name-import',
+        name: UNRESOLVED_NAME_IMPORT_RULE_NAME,
         severity: 'error',
         comment: 'marks an import of a workspace package by a name that resolves to no file',
         from: { path: packagesPattern(packages) },
