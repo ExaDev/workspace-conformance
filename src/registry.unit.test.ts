@@ -32,12 +32,20 @@ describe('registry', () => {
   });
 
   it('refuses to run a check that is not enabled', async () => {
-    await expect(registry['single-storybook'].run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined })).rejects.toThrow(ConformanceError);
-    await expect(registry['import-uphill'].run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined })).rejects.toThrow("'import-uphill' is not enabled");
+    const storybook = registry['single-storybook'];
+    if (!('run' in storybook)) {
+      throw new Error('single-storybook has no run');
+    }
+
+    await expect(storybook.run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined })).rejects.toThrow(ConformanceError);
   });
 
-  it('refuses to run a layout check without the layout', async () => {
-    await expect(registry['import-uphill'].run({ cwd: '.', checks: { 'import-uphill': {} }, layout: undefined, configFiles: undefined })).rejects.toThrow('reads the workspace layout');
+  it('gives the import checks a place in the shared cruise and no run of their own', () => {
+    for (const name of checkNames.filter((checkName) => registry[checkName].requiresLayout)) {
+      const entry = registry[name];
+      expect('importGraph' in entry).toBe(true);
+      expect('run' in entry).toBe(false);
+    }
   });
 });
 

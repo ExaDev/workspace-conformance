@@ -6,7 +6,7 @@ import { type ImportCheckEntry, runImportChecks } from './checks/import-graph';
 import { type ChecksConfig, type ConformanceConfig, conformanceSection } from './config';
 import { ConformanceError } from './errors';
 import type { CheckName } from './options';
-import { checkNames, registry } from './registry';
+import { checkNames, type RegisteredCheck, registry } from './registry';
 
 /**
  * The process exit codes of the command line: nothing found, something found, or the checks could not run.
@@ -119,10 +119,13 @@ async function runImportGraphChecks(
   checks: ChecksConfig,
 ): Promise<ReadonlyMap<string, readonly Violation[]>> {
   const entries = names.flatMap((name): readonly ImportCheckEntry[] => {
-    const importGraph = registry[name].importGraph;
-    const options = importGraph?.optionsOf(checks);
+    const check: RegisteredCheck<CheckName> = registry[name];
+    if (!('importGraph' in check)) {
+      return [];
+    }
+    const options = check.importGraph.optionsOf(checks);
 
-    return importGraph === undefined || options === undefined ? [] : [{ spec: importGraph.spec, options }];
+    return options === undefined ? [] : [{ spec: check.importGraph.spec, options }];
   });
   if (entries.length === 0) {
     return new Map();
@@ -132,6 +135,18 @@ async function runImportGraphChecks(
   }
 
   return runImportChecks({ cwd, layout, entries });
+}
+
+/**
+ * The findings of an import check that `runImportGraphChecks` ran. Every import check among the selected names has an entry, so a missing one is a defect.
+ */
+function readImported(imported: ReadonlyMap<string, readonly Violation[]>, name: CheckName): readonly Violation[] {
+  const found = imported.get(name);
+  if (found === undefined) {
+    throw new ConformanceError(`the import check '${name}' produced no result`);
+  }
+
+  return found;
 }
 
 /**
@@ -151,8 +166,8 @@ export async function runChecks(options: RunChecksOptions): Promise<RunResult> {
 
   const results: CheckResult[] = [];
   for (const name of names) {
-    const shared = imported.get(name);
-    const violations = shared ?? (await registry[name].run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles }));
+    const check: RegisteredCheck<CheckName> = registry[name];
+    const violations = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles }) : readImported(imported, name);
     results.push({ check: name, violations });
   }
   const violations = results.flatMap((result) => result.violations);
