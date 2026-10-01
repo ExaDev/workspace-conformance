@@ -1,0 +1,19 @@
+name: CI
+on: push
+jobs:
+  resolve:
+    uses: ./.github/workflows/resolve.yml
+  build:
+    needs: resolve
+    runs-on: ${{ fromJson(needs.resolve.outputs.runner) }}
+    steps:
+      - run: echo build
+  lint:
+    needs: resolve
+    runs-on: ${{ fromJson(needs.resolve.outputs.runner) }}
+    steps:
+      - run: echo lint
+  one-off:
+    runs-on: [self-hosted, gpu]
+    steps:
+      - run: echo gpu

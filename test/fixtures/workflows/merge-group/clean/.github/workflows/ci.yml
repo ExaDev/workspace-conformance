@@ -1,0 +1,11 @@
+name: CI
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test

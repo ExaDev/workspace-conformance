@@ -25,6 +25,19 @@ describe('registry', () => {
     ]);
   });
 
+  it('marks exactly the settings checks as reading the repository through the GitHub API', () => {
+    expect(checkNames.filter((name) => registry[name].requiresGitHub)).toEqual(['settings-merge-methods', 'settings-required-checks', 'settings-review-thread-resolution']);
+  });
+
+  it('refuses to run a settings check without a GitHub client', async () => {
+    const settings = registry['settings-merge-methods'];
+    if (!('run' in settings)) {
+      throw new Error('settings-merge-methods has no run');
+    }
+
+    await expect(settings.run({ cwd: '.', checks: { 'settings-merge-methods': {} }, layout: undefined, configFiles: undefined, github: undefined })).rejects.toThrow(/needs a GitHub client/u);
+  });
+
   it('treats a check as enabled when its setting is an options object, and not when it is false or absent', () => {
     expect(registry['single-storybook'].isEnabled({ 'single-storybook': {} })).toBe(true);
     expect(registry['single-storybook'].isEnabled({ 'single-storybook': false })).toBe(false);
@@ -37,7 +50,7 @@ describe('registry', () => {
       throw new Error('single-storybook has no run');
     }
 
-    await expect(storybook.run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined })).rejects.toThrow(ConformanceError);
+    await expect(storybook.run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined, github: undefined })).rejects.toThrow(ConformanceError);
   });
 
   it('gives the import checks a place in the shared cruise and no run of their own', () => {

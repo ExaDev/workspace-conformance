@@ -1,0 +1,31 @@
+name: CI
+on: push
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.pick.outputs.runner }}
+    steps:
+      - id: pick
+        run: echo 'runner=["fleet"]' >> "$GITHUB_OUTPUT"
+  build:
+    needs: resolve
+    runs-on: ${{ fromJson(needs.resolve.outputs.runner) }}
+    steps:
+      - run: echo build
+  lint:
+    runs-on: [self-hosted, fleet]
+    steps:
+      - run: echo lint
+  test:
+    runs-on: [self-hosted, fleet]
+    steps:
+      - run: echo test
+  hosted-a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo a
+  hosted-b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo b

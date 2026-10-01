@@ -1,0 +1,16 @@
+name: CI
+on:
+  pull_request:
+  merge_group:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo test
+  required-checks:
+    name: Required Checks
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo done

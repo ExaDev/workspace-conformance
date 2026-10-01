@@ -1,4 +1,5 @@
 import type { DeployToolName, GeneratorName } from './migrations/adapters';
+import type { WorkflowSelection } from './workflows/load';
 
 /**
  * Options of the `aggregate-mappers` check: every aggregate type a contract exports has a mapper file in the place the template names.
@@ -165,6 +166,169 @@ export interface MigrationsDirectoryOptions {
 }
 
 /**
+ * Options of the `workflow-job-ordering` check: the jobs that release, deploy and report a required check are ordered so a failure stops what follows. Jobs are named by id; a role whose jobs are absent from a workflow is not judged there.
+ */
+export interface WorkflowJobOrderingOptions extends WorkflowSelection {
+  /**
+   * Ids of release jobs, which must wait for every deploy job. `release` when omitted.
+   */
+  readonly releaseJobs?: readonly string[];
+  /**
+   * Ids of deploy jobs. `deploy` when omitted.
+   */
+  readonly deployJobs?: readonly string[];
+  /**
+   * Ids of jobs that deploy documentation, which must wait for every release job and check out the default branch afresh. `docs-deploy` when omitted.
+   */
+  readonly docsDeployJobs?: readonly string[];
+  /**
+   * Ids of junction jobs: the one job that reports a single required check for the whole workflow. `required-checks` when omitted.
+   */
+  readonly junctionJobs?: readonly string[];
+  /**
+   * Ids of jobs a junction job need not wait for, such as a release job that only runs after the junction's own checks or a job that runs on demand only.
+   */
+  readonly junctionExempt?: readonly string[];
+  /**
+   * The default branch a documentation job must check out when it names a branch literally. `main` when omitted. The `github.event.repository.default_branch` expression is always accepted.
+   */
+  readonly defaultBranch?: string;
+}
+
+/**
+ * Options of the `workflow-skippable-jobs` check: a path filter must not leave a required check pending or skip a job without a junction job to report for it.
+ */
+export interface WorkflowSkippableJobsOptions extends WorkflowSelection {
+  /**
+   * Ids of junction jobs. `required-checks` when omitted.
+   */
+  readonly junctionJobs?: readonly string[];
+  /**
+   * The actions whose outputs say which paths changed, as `owner/repository`. `dorny/paths-filter`, `tj-actions/changed-files` and `step-security/changed-files` when omitted.
+   */
+  readonly pathFilterActions?: readonly string[];
+}
+
+/**
+ * Options of the `workflow-runner-resolution` check: a self-hosted or custom runner label is resolved once and read, not repeated.
+ */
+export interface WorkflowRunnerResolutionOptions extends WorkflowSelection {
+  /**
+   * Regular expressions, as source text, for the labels GitHub hosts itself and that may be repeated freely. `ubuntu`, `windows` and `macos` images, `-latest`, versioned, `-arm`, `-intel`, `-xlarge`, `-large` and `-slim` forms, when omitted. Setting it replaces that default.
+   */
+  readonly hostedLabels?: readonly string[];
+}
+
+/**
+ * Options of the `workflow-version-single-source` check.
+ */
+export type WorkflowVersionSingleSourceOptions = WorkflowSelection;
+
+/**
+ * Options of the `workflow-credentials` check.
+ */
+export type WorkflowCredentialsOptions = WorkflowSelection;
+
+/**
+ * Options of the `workflow-repository-dispatch` check: what a handler of `repository_dispatch` may do.
+ */
+export interface WorkflowRepositoryDispatchOptions extends WorkflowSelection {
+  /**
+   * Branch names that count as the default branch when a push names one literally. `main` and `master` when omitted. The `github.event.repository.default_branch` expression always counts.
+   */
+  readonly defaultBranches?: readonly string[];
+  /**
+   * Set when the repository has a rule requiring status checks on the default branch, which is what makes `gh pr merge --auto` wait. The file cannot show it, so by default an auto merge in a handler is reported; the `settings-required-checks` check verifies the rule itself.
+   */
+  readonly assumeRequiredChecks?: boolean;
+}
+
+/**
+ * Options of the `workflow-update-bot-cooldown` check: the update bots wait before proposing a release.
+ */
+export interface WorkflowUpdateBotCooldownOptions {
+  /**
+   * The Dependabot config, relative to the directory the checks run in. `.github/dependabot.yml`, else `.github/dependabot.yaml`, when omitted.
+   */
+  readonly dependabot?: string;
+  /**
+   * The Renovate config. `renovate.json`, `.renovaterc.json`, `.renovaterc` and `.github/renovate.json`, the first that exists, when omitted.
+   */
+  readonly renovate?: string;
+}
+
+/**
+ * Options of the `workflow-merge-group` check.
+ */
+export type WorkflowMergeGroupOptions = WorkflowSelection;
+
+/**
+ * How strictly a reference must be pinned: to a full commit SHA, or any ref (tag, branch or SHA).
+ */
+export type PinningLevel = 'sha' | 'ref';
+
+/**
+ * Options of the `workflow-action-pinning` check: the pinning policy for what workflows `uses`.
+ */
+export interface WorkflowActionPinningOptions extends WorkflowSelection {
+  /**
+   * What an action or reusable workflow from outside `organisations` must be pinned to. `sha` when omitted.
+   */
+  readonly thirdParty?: PinningLevel;
+  /**
+   * What an action or reusable workflow owned by one of `organisations` must be pinned to. `ref` when omitted.
+   */
+  readonly sameOrganisation?: PinningLevel;
+  /**
+   * The owners (users or organisations) that count as the same organisation. None when omitted, so nothing is relaxed unless it is named.
+   */
+  readonly organisations?: readonly string[];
+  /**
+   * Repositories exempt from the policy, as `owner/repository` or `owner/*`.
+   */
+  readonly allow?: readonly string[];
+}
+
+/**
+ * What the settings checks need to find the repository.
+ */
+export interface SettingsOptions {
+  /**
+   * The repository as `owner/name`. The `origin` remote of the working directory when omitted.
+   */
+  readonly repository?: string;
+  /**
+   * The branch whose rules are read. The repository's default branch when omitted.
+   */
+  readonly branch?: string;
+}
+
+/**
+ * Options of the `settings-merge-methods` check.
+ */
+export interface SettingsMergeMethodsOptions extends SettingsOptions {
+  /**
+   * The only merge method the repository allows. `rebase` when omitted.
+   */
+  readonly allowed?: 'rebase' | 'squash' | 'merge';
+}
+
+/**
+ * Options of the `settings-required-checks` check.
+ */
+export interface SettingsRequiredChecksOptions extends SettingsOptions, WorkflowSelection {
+  /**
+   * Ids of the junction jobs whose check names must be required. `required-checks` when omitted.
+   */
+  readonly junctionJobs?: readonly string[];
+}
+
+/**
+ * Options of the `settings-review-thread-resolution` check.
+ */
+export type SettingsReviewThreadResolutionOptions = SettingsOptions;
+
+/**
  * The options of every check, by check name.
  */
 export interface CheckOptionsByName {
@@ -180,6 +344,18 @@ export interface CheckOptionsByName {
   readonly 'commit-types': CommitTypesOptions;
   readonly 'dockerfile-package-manager': DockerfilePackageManagerOptions;
   readonly 'migrations-directory': MigrationsDirectoryOptions;
+  readonly 'workflow-job-ordering': WorkflowJobOrderingOptions;
+  readonly 'workflow-skippable-jobs': WorkflowSkippableJobsOptions;
+  readonly 'workflow-runner-resolution': WorkflowRunnerResolutionOptions;
+  readonly 'workflow-version-single-source': WorkflowVersionSingleSourceOptions;
+  readonly 'workflow-credentials': WorkflowCredentialsOptions;
+  readonly 'workflow-repository-dispatch': WorkflowRepositoryDispatchOptions;
+  readonly 'workflow-update-bot-cooldown': WorkflowUpdateBotCooldownOptions;
+  readonly 'workflow-merge-group': WorkflowMergeGroupOptions;
+  readonly 'workflow-action-pinning': WorkflowActionPinningOptions;
+  readonly 'settings-merge-methods': SettingsMergeMethodsOptions;
+  readonly 'settings-required-checks': SettingsRequiredChecksOptions;
+  readonly 'settings-review-thread-resolution': SettingsReviewThreadResolutionOptions;
 }
 
 /**

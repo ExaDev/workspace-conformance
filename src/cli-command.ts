@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { Violation } from './check';
+import { createGitHubClient, type GitHubClient } from './github';
 import type { CheckName } from './options';
 import { checkNames, isCheckName, registry } from './registry';
 import { EXIT_CODES, runChecks } from './run-checks';
@@ -14,13 +15,14 @@ export interface CommandOutput {
   readonly stderr: (text: string) => void;
 }
 
-const USAGE = `Usage: workspace-conformance check [--cwd <directory>] [--check <name>]... [--list]
+const USAGE = `Usage: workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings]
 
 Runs the conformance checks enabled in the 'conformance' section of exadev.config.ts (or exadev.conformance.config.ts).
 
   --cwd <directory>   Directory that holds the config files. Defaults to the current directory.
   --check <name>      Run only this check, which must be enabled. Repeatable.
   --list              Print the names of all checks and stop.
+  --settings          Also run the enabled settings-* checks, which read the repository's settings through the GitHub API with the token in GITHUB_TOKEN or GH_TOKEN. Offline otherwise.
   --help, -h          Show this message.
 
 Exit status: ${String(EXIT_CODES.clean)} when nothing is found, ${String(EXIT_CODES.violations)} when a check finds a violation, ${String(EXIT_CODES.failed)} when the checks could not run.
@@ -46,10 +48,22 @@ function requestedChecks(names: readonly string[]): readonly CheckName[] {
   });
 }
 
+/**
+ * The client the settings checks read through, authenticated by the token in `GITHUB_TOKEN` or `GH_TOKEN`.
+ */
+function clientFromEnvironment(): GitHubClient {
+  const token = process.env['GITHUB_TOKEN'] ?? process.env['GH_TOKEN'];
+  if (token === undefined || token === '') {
+    throw new TypeError('--settings needs a token in GITHUB_TOKEN or GH_TOKEN');
+  }
+
+  return createGitHubClient({ token });
+}
+
 async function runCheck(args: readonly string[], output: CommandOutput): Promise<number> {
   const { values } = parseArgs({
     args: [...args],
-    options: { cwd: { type: 'string' }, check: { type: 'string', multiple: true }, list: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } },
+    options: { cwd: { type: 'string' }, check: { type: 'string', multiple: true }, list: { type: 'boolean' }, settings: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } },
     allowPositionals: false,
   });
   if (values.help === true) {
@@ -66,7 +80,7 @@ async function runCheck(args: readonly string[], output: CommandOutput): Promise
     return EXIT_CODES.clean;
   }
   const cwd = resolve(values.cwd ?? process.cwd());
-  const result = await runChecks({ cwd, ...(requested === undefined ? {} : { checks: requested }) });
+  const result = await runChecks({ cwd, ...(requested === undefined ? {} : { checks: requested }), ...(values.settings === true ? { github: clientFromEnvironment() } : {}) });
   for (const violation of result.violations) {
     output.stderr(formatViolation(violation));
   }

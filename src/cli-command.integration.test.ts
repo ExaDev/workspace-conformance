@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { fixturePath } from '../test/support/temp';
 import { runCommand } from './cli-command';
@@ -103,6 +103,25 @@ describe('check --list', () => {
 
     expect(result.code).toBe(EXIT_CODES.clean);
     expect(result.stdout.split('\n').filter((line) => line !== '').map((line) => line.split('\t')[0])).toEqual(checkNames);
+  });
+});
+
+describe('check --settings', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('exits 2 without a token in GITHUB_TOKEN or GH_TOKEN', async () => {
+    vi.stubEnv('GITHUB_TOKEN', '');
+    vi.stubEnv('GH_TOKEN', '');
+    const result = await run('check', '--settings', '--cwd', fixturePath('storybook', 'clean'));
+
+    expect(result.code).toBe(EXIT_CODES.failed);
+    expect(result.stderr).toBe('--settings needs a token in GITHUB_TOKEN or GH_TOKEN\n');
+  });
+
+  it('is described in the usage', async () => {
+    expect((await run('check', '--help')).stdout).toContain('--settings');
   });
 });
 

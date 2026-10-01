@@ -36,6 +36,10 @@ function compiles(source: string): boolean {
 const pattern = z.string().min(1).refine(compiles, 'not a valid regular expression');
 const patterns = z.array(pattern);
 
+const selection = { workflows: z.exactOptional(paths), exclude: z.exactOptional(paths) };
+const pinningLevel = z.enum(['sha', 'ref']);
+const settings = { repository: z.exactOptional(z.string().regex(/^[^/\s]+\/[^/\s]+$/u, 'expected owner/name')), branch: z.exactOptional(z.string().min(1)) };
+
 const importGraph = z.strictObject({ exclude: z.exactOptional(patterns), doNotFollow: z.exactOptional(patterns), tsConfig: z.exactOptional(path) });
 
 /**
@@ -92,6 +96,32 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
       }),
     ),
   ),
+  'workflow-job-ordering': z.exactOptional(
+    enabled(
+      z.strictObject({
+        ...selection,
+        releaseJobs: z.exactOptional(names),
+        deployJobs: z.exactOptional(names),
+        docsDeployJobs: z.exactOptional(names),
+        junctionJobs: z.exactOptional(names),
+        junctionExempt: z.exactOptional(names),
+        defaultBranch: z.exactOptional(z.string().min(1)),
+      }),
+    ),
+  ),
+  'workflow-skippable-jobs': z.exactOptional(enabled(z.strictObject({ ...selection, junctionJobs: z.exactOptional(names), pathFilterActions: z.exactOptional(names) }))),
+  'workflow-runner-resolution': z.exactOptional(enabled(z.strictObject({ ...selection, hostedLabels: z.exactOptional(patterns) }))),
+  'workflow-version-single-source': z.exactOptional(enabled(z.strictObject(selection))),
+  'workflow-credentials': z.exactOptional(enabled(z.strictObject(selection))),
+  'workflow-repository-dispatch': z.exactOptional(enabled(z.strictObject({ ...selection, defaultBranches: z.exactOptional(names), assumeRequiredChecks: z.exactOptional(z.boolean()) }))),
+  'workflow-update-bot-cooldown': z.exactOptional(enabled(z.strictObject({ dependabot: z.exactOptional(path), renovate: z.exactOptional(path) }))),
+  'workflow-merge-group': z.exactOptional(enabled(z.strictObject(selection))),
+  'workflow-action-pinning': z.exactOptional(
+    enabled(z.strictObject({ ...selection, thirdParty: z.exactOptional(pinningLevel), sameOrganisation: z.exactOptional(pinningLevel), organisations: z.exactOptional(names), allow: z.exactOptional(names) })),
+  ),
+  'settings-merge-methods': z.exactOptional(enabled(z.strictObject({ ...settings, allowed: z.exactOptional(z.enum(['rebase', 'squash', 'merge'])) }))),
+  'settings-required-checks': z.exactOptional(enabled(z.strictObject({ ...settings, ...selection, junctionJobs: z.exactOptional(names) }))),
+  'settings-review-thread-resolution': z.exactOptional(enabled(z.strictObject(settings))),
 });
 
 /**

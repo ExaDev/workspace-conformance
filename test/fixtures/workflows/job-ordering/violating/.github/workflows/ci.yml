@@ -1,0 +1,29 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo build
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo deploy
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo release
+  docs-deploy:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo docs
+  required-checks:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') }}" == "true" ]]; then exit 1; fi

@@ -28,6 +28,18 @@ describe('conformanceSchema', () => {
         'single-storybook': { location: '.', exclude: ['test/fixtures/**'] },
         'commit-types': { commitlint: 'c.ts', release: 'r.ts' },
         'dockerfile-package-manager': { dockerfiles: ['Dockerfile'], exclude: ['test/fixtures/**'], packageJson: 'package.json' },
+        'workflow-job-ordering': { workflows: ['.github/workflows/ci.yml'], exclude: ['x'], releaseJobs: ['release'], deployJobs: ['deploy'], docsDeployJobs: ['docs'], junctionJobs: ['gate'], junctionExempt: ['nightly'], defaultBranch: 'main' },
+        'workflow-skippable-jobs': { junctionJobs: ['gate'], pathFilterActions: ['dorny/paths-filter'] },
+        'workflow-runner-resolution': { hostedLabels: ['^ubuntu-'] },
+        'workflow-version-single-source': {},
+        'workflow-credentials': {},
+        'workflow-repository-dispatch': { defaultBranches: ['main'], assumeRequiredChecks: true },
+        'workflow-update-bot-cooldown': { dependabot: '.github/dependabot.yml', renovate: 'renovate.json' },
+        'workflow-merge-group': false,
+        'workflow-action-pinning': { thirdParty: 'sha', sameOrganisation: 'ref', organisations: ['example-org'], allow: ['actions/*'] },
+        'settings-merge-methods': { repository: 'example-org/example-repo', branch: 'main', allowed: 'rebase' },
+        'settings-required-checks': { repository: 'example-org/example-repo', junctionJobs: ['gate'], workflows: ['.github/workflows/*.yml'] },
+        'settings-review-thread-resolution': {},
         'migrations-directory': {
           generator: 'drizzle-kit',
           deployTool: 'wrangler',
@@ -75,6 +87,13 @@ describe('conformanceSchema', () => {
     expect(await issuesOf({ checks: { 'aggregate-mappers': { contracts: [], mapper: 'x' } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'single-storybook': { location: '' } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'import-uphill': { exclude: 'x' } } })).toBeDefined();
+  });
+
+  it('rejects a pinning level that is neither sha nor ref, a repository that is not owner/name and a boolean that is not one', async () => {
+    expect(await issuesOf({ checks: { 'workflow-action-pinning': { thirdParty: 'tag' } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'settings-merge-methods': { repository: 'example' } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'settings-merge-methods': { allowed: 'fast-forward' } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'workflow-repository-dispatch': { assumeRequiredChecks: 'yes' } } })).toBeDefined();
   });
 
   it('rejects an option written as undefined, as the type does under exactOptionalPropertyTypes', async () => {

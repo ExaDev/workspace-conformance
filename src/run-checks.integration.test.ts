@@ -1,10 +1,11 @@
 import { ConfigValidationError, type LayoutConfig } from '@exadev/config';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { importsLayout } from '../test/support/layouts';
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../test/support/temp';
 import type { ConformanceConfig } from './config';
 import { ConformanceError } from './errors';
+import type { GitHubClient } from './github';
 import { EXIT_CODES, runChecks } from './run-checks';
 
 const violating = fixturePath('imports', 'violating');
@@ -114,5 +115,35 @@ describe('runChecks with configFiles', () => {
 
     expect((await runChecks({ cwd: workspace, config, configFiles: { alias: { '@shared': shared } } })).violations).toEqual([]);
     await expect(runChecks({ cwd: workspace, config })).rejects.toThrow();
+  });
+});
+
+describe('runChecks with the settings checks', () => {
+  const settings: ConformanceConfig = { checks: { 'workflow-merge-group': {}, 'settings-review-thread-resolution': { repository: 'example-org/example-repo' } } };
+  const github: GitHubClient = {
+    repository: vi.fn<GitHubClient['repository']>().mockResolvedValue({ defaultBranch: 'main', allowRebaseMerge: true, allowSquashMerge: false, allowMergeCommit: false }),
+    branchRules: vi.fn<GitHubClient['branchRules']>().mockResolvedValue({ requiredStatusChecks: [], pullRequests: [] }),
+  };
+
+  it('stays offline without a client, running only the checks that read files', async () => {
+    const result = await runChecks({ cwd: fixturePath('workflows', 'merge-group', 'clean'), config: settings });
+
+    expect(result.results.map((entry) => entry.check)).toEqual(['workflow-merge-group']);
+  });
+
+  it('runs them in registry order when it is given a client', async () => {
+    const result = await runChecks({ cwd: fixturePath('workflows', 'merge-group', 'clean'), config: settings, github });
+
+    expect(result.results.map((entry) => entry.check)).toEqual(['workflow-merge-group', 'settings-review-thread-resolution']);
+    expect(result.violations.map((violation) => violation.code)).toEqual(['settings-review-thread-resolution/not-required']);
+  });
+
+  it('fails when only settings checks are enabled and there is no client, rather than reporting a pass', async () => {
+    await expect(runChecks({ cwd: clean, config: { checks: { 'settings-review-thread-resolution': {} } } })).rejects.toThrow(/only checks that read the repository's settings are enabled/u);
+  });
+
+  it('fails when a settings check is requested without a client', async () => {
+    await expect(runChecks({ cwd: clean, config: settings, checks: ['settings-review-thread-resolution'] })).rejects.toThrow(/settings-review-thread-resolution reads the repository's settings and needs a GitHub client/u);
+    await expect(runChecks({ cwd: clean, config: settings, checks: ['settings-review-thread-resolution', 'workflow-merge-group'] })).rejects.toThrow(/needs a GitHub client/u);
   });
 });

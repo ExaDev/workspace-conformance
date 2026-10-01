@@ -1,0 +1,31 @@
+name: Update
+on:
+  repository_dispatch:
+    types: [update]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  branch-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.APP_TOKEN }}
+      - run: |
+          git checkout -b update
+          git commit -am update
+          git push origin update
+          gh pr create --fill
+        env:
+          GH_TOKEN: ${{ secrets.APP_TOKEN }}
+  dispatch-here:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh api repos/${{ github.repository }}/dispatches -f event_type=again
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  not-a-handler-effect:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "git push origin HEAD:main is only text"
