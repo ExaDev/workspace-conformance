@@ -21,9 +21,9 @@ const RESOLVED_RUNNER = /fromJSON\(\s*needs\.([\w-]+)\.outputs\.([\w-]+)\s*\)/gi
 const JOB_OUTPUT_REFERENCE = /^\$\{\{\s*jobs\.([\w-]+)\.outputs\.([\w-]+)\s*\}\}$/u;
 
 /**
- * A fallback in an output expression: `||` followed by a string literal.
+ * A fallback in an output expression: `||` followed by a string literal, whose body may hold `''` for a quote.
  */
-const LITERAL_FALLBACK = /\|\|\s*'/u;
+const LITERAL_FALLBACK = /\|\|\s*'((?:[^']|'')*)'/gu;
 
 interface Resolver {
   readonly workflow: Workflow;
@@ -70,16 +70,46 @@ function implementation(workflow: Workflow, workflows: readonly Workflow[], call
   return job === undefined || jobOutput === undefined ? undefined : { workflow: called, job, output: jobOutput };
 }
 
-function resolverViolations(resolver: Resolver): readonly Violation[] {
+/**
+ * The runner labels the last literal fallback of an output expression names, read as the JSON the `fromJson` that consumes it expects: a label or a list of labels. `undefined` when there is no literal fallback, and an empty list when the literal is not labels.
+ */
+function fallbackLabels(expression: string): readonly string[] | undefined {
+  const literal = [...expression.matchAll(LITERAL_FALLBACK)].at(-1)?.[1]?.replaceAll("''", "'");
+  if (literal === undefined) {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(literal);
+  } catch {
+    return [];
+  }
+  const items: readonly unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+  const labels = items.filter((item): item is string => typeof item === 'string');
+
+  return labels.length === items.length ? labels : [];
+}
+
+function resolverViolations(resolver: Resolver, hosted: readonly RegExp[]): readonly Violation[] {
   const violations: Violation[] = [];
   if (resolver.job.timeoutMinutes === undefined) {
     violations.push(
       workflowViolation(resolver.workflow, 'workflow-runner-resolution/resolver-no-timeout', `resolver job '${resolver.job.id}' has no timeout-minutes, so a runner that never starts holds every job waiting for it until the default six hours`, resolver.job.location),
     );
   }
-  if (!LITERAL_FALLBACK.test(resolver.job.outputs[resolver.output] ?? '')) {
+  const fallback = fallbackLabels(resolver.job.outputs[resolver.output] ?? '');
+  if (fallback === undefined) {
     violations.push(
       workflowViolation(resolver.workflow, 'workflow-runner-resolution/resolver-no-fallback', `output '${resolver.output}' of resolver job '${resolver.job.id}' has no literal fallback (\`|| '["<hosted label>"]'\`), so the jobs that read it have no runner when resolution produces nothing`, resolver.job.location),
+    );
+  } else if (fallback.length === 0 || !fallback.every((label) => hosted.some((pattern) => pattern.test(label)))) {
+    violations.push(
+      workflowViolation(
+        resolver.workflow,
+        'workflow-runner-resolution/resolver-fallback-not-hosted',
+        `the literal fallback of output '${resolver.output}' of resolver job '${resolver.job.id}' does not name only hosted runner labels, so it offers no runner when the self-hosted fleet is down`,
+        resolver.job.location,
+      ),
     );
   }
 
@@ -111,9 +141,9 @@ function repeatedLabels(workflow: Workflow, hosted: readonly RegExp[]): readonly
 }
 
 /**
- * A self-hosted or custom runner label named literally in more than one job of a workflow is resolved once instead: a resolver job decides the runner and the others read it with `fromJson(needs.<resolver>.outputs.<name>)`. The resolver must have a `timeout-minutes` and its output a literal fallback, so jobs still get a runner when resolution fails.
+ * A self-hosted or custom runner label named literally in more than one job of a workflow is resolved once instead: a resolver job decides the runner and the others read it with `fromJson(needs.<resolver>.outputs.<name>)`. The resolver must have a `timeout-minutes` and its output a literal fallback that names only hosted runner labels, so jobs still get a runner when resolution fails or the self-hosted fleet is down.
  *
- * A label is custom when it matches none of `hostedLabels`; the default patterns recognise GitHub's standard images, so a larger runner is named by a custom label and counts. Labels are compared within a workflow file, not across files. A resolver that is a reusable workflow is followed when it is a file of this repository (the output is traced through `on.workflow_call.outputs` to the job that sets it); a resolver in another repository cannot be read and is not judged. An output is taken to have a fallback when its expression has `||` followed by a string literal.
+ * A label is custom when it matches none of `hostedLabels`; the default patterns recognise GitHub's standard images, so a larger runner is named by a custom label and counts. Labels are compared within a workflow file, not across files. A resolver that is a reusable workflow is followed when it is a file of this repository (the output is traced through `on.workflow_call.outputs` to the job that sets it); a resolver in another repository cannot be read and is not judged. An output is taken to have a fallback when its expression has `||` followed by a string literal, and the last such literal is read as JSON (a label or a list of labels) and matched against `hostedLabels`; a fallback that is not valid JSON, or names any other label, is reported.
  */
 export const workflowRunnerResolution: CheckFunction<WorkflowRunnerResolutionOptions> = async ({ cwd, options }) => {
   const hosted = (options.hostedLabels ?? DEFAULT_HOSTED_LABELS).map((source) => new RegExp(source, 'u'));
@@ -126,5 +156,5 @@ export const workflowRunnerResolution: CheckFunction<WorkflowRunnerResolutionOpt
     }
   }
 
-  return [...selected.flatMap((workflow) => repeatedLabels(workflow, hosted)), ...[...resolvers.values()].flatMap(resolverViolations)];
+  return [...selected.flatMap((workflow) => repeatedLabels(workflow, hosted)), ...[...resolvers.values()].flatMap((resolver) => resolverViolations(resolver, hosted))];
 };

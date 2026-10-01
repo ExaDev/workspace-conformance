@@ -14,7 +14,8 @@ describe('this repository', () => {
           'single-storybook': { exclude: ['test/fixtures/**'] },
           'dockerfile-package-manager': { exclude: ['test/fixtures/**'] },
           'workflow-job-ordering': {},
-          'workflow-runner-resolution': {},
+          // The fallback is Blacksmith, which runs outside both the self-hosted fleet and GitHub's own billing.
+          'workflow-runner-resolution': { hostedLabels: ['^blacksmith-', '^(?:ubuntu|windows|macos)-'] },
           'workflow-credentials': {},
           'workflow-skippable-jobs': {},
           'workflow-version-single-source': {},

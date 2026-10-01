@@ -251,6 +251,38 @@ describe('workflow-runner-resolution', () => {
     expect(await workflowRunnerResolution({ cwd: fixture('runner-resolution', 'clean'), options: {} })).toEqual([]);
   });
 
+  it('reports a fallback that names a label which is not hosted, an empty fallback and one that is not JSON, and accepts a bare hosted label', async () => {
+    const cwd = await makeTempDir();
+    const workflow = (fallback: string): string => `on: push
+jobs:
+  resolve:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    outputs:
+      runner: >-
+        \${{ steps.r.outputs.runner || ${fallback} }}
+    steps:
+      - id: r
+        run: echo
+  build:
+    needs: resolve
+    runs-on: \${{ fromJson(needs.resolve.outputs.runner) }}
+`;
+    const reported: string[] = [];
+    for (const fallback of [`'["self-hosted"]'`, `'["ubuntu-latest", "self-hosted"]'`, `'[]'`, `'ubuntu-latest'`, `'["ubuntu-latest"]'`, `'"ubuntu-24.04"'`, `'[{"group": "fleet"}]'`]) {
+      await writeFiles(cwd, { [CI]: workflow(fallback) });
+      if ((await workflowRunnerResolution({ cwd, options: {} })).length > 0) {
+        reported.push(fallback);
+      }
+    }
+
+    expect(reported).toEqual([`'["self-hosted"]'`, `'["ubuntu-latest", "self-hosted"]'`, `'[]'`, `'ubuntu-latest'`, `'[{"group": "fleet"}]'`]);
+
+    await writeFiles(cwd, { [CI]: workflow(`'["self-hosted"]'`) });
+
+    expect(where(await workflowRunnerResolution({ cwd, options: {} }))).toEqual([`workflow-runner-resolution/resolver-fallback-not-hosted ${CI}:3`]);
+  });
+
   it('counts a runner group, and takes the hosted labels from the options', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, {
