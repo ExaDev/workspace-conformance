@@ -13,6 +13,7 @@ assert.deepEqual(
   [
     ['command-types/hand-written-interface', 'contract/commands.ts'],
     ['import-uphill/higher-rank', 'libs/core/src/index.ts'],
+    ['workflow-merge-group/missing-trigger', '.github/workflows/ci.yml'],
   ],
 );
 assert.equal(result.exitCode, EXIT_CODES.violations);
