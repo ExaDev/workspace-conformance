@@ -7,7 +7,7 @@ assert.ok(PRESET_COMMIT_TYPES.includes('feat'));
 runChecks({ cwd: process.cwd() }).then((result) => {
   assert.deepEqual(
     result.violations.map((violation) => violation.code),
-    ['command-types/hand-written-interface', 'import-uphill/higher-rank'],
+    ['command-types/hand-written-interface', 'import-uphill/higher-rank', 'workflow-merge-group/missing-trigger'],
   );
   assert.equal(result.exitCode, EXIT_CODES.violations);
 });

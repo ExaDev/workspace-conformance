@@ -22,7 +22,7 @@ npm install --engine-strict "$pack_dir"/*.tgz "cosmiconfig@$cosmiconfig_major" "
 
 cp "$here/check.mjs" "$here/check.cjs" .
 
-# The workspace: a rank 0 library that imports a rank 1 app (uphill), a hand-written command interface, and instruction files that are git symlinks.
+# The workspace: a rank 0 library that imports a rank 1 app (uphill), a hand-written command interface, instruction files that are git symlinks, and a workflow that runs for pull requests but not for the merge queue.
 mkdir -p libs/core/src apps/web/src contract
 printf 'packages:\n  - libs/*\n  - apps/*\n' > pnpm-workspace.yaml
 echo '{ "name": "@scratch/core" }' > libs/core/package.json
@@ -33,6 +33,8 @@ echo 'export const web = 1;' > apps/web/src/index.ts
 echo 'export interface CancelOrder { readonly orderId: string }' > contract/commands.ts
 echo '{ "compilerOptions": { "module": "ESNext", "moduleResolution": "bundler", "strict": true } }' > tsconfig.json
 echo '# scratch' > README.md
+mkdir -p .github/workflows
+printf 'name: CI\non:\n  pull_request:\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n' > .github/workflows/ci.yml
 ln -s README.md AGENTS.md
 ln -s README.md CLAUDE.md
 git init --quiet
@@ -54,6 +56,7 @@ export default withSections(
       'command-types': { commands: ['contract/commands.ts'] },
       'instruction-symlinks': {},
       'single-storybook': {},
+      'workflow-merge-group': {},
     },
   },
 });
