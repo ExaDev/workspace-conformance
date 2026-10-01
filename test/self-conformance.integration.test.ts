@@ -13,6 +13,11 @@ describe('this repository', () => {
           'instruction-symlinks': {},
           'single-storybook': { exclude: ['test/fixtures/**'] },
           'dockerfile-package-manager': { exclude: ['test/fixtures/**'] },
+          'workflow-job-ordering': {},
+          'workflow-runner-resolution': {},
+          'workflow-credentials': {},
+          'workflow-skippable-jobs': {},
+          'workflow-version-single-source': {},
         },
       },
     });
