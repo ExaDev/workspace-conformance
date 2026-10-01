@@ -1,16 +1,16 @@
 import type { ConfigFileOptions, LayoutConfig } from '@exadev/config';
 
-import type { CheckFunction, LayoutCheckFunction, Violation } from './check';
+import type { CheckFunction, Violation } from './check';
 import { aggregateMappers } from './checks/aggregate-mappers';
 import { commandTypes } from './checks/command-types';
 import { commitTypes } from './checks/commit-types';
 import { dockerfilePackageManager } from './checks/dockerfile-package-manager';
-import { importCrossSlice, importCrossSliceSpec } from './checks/import-cross-slice';
-import { importCycles, importCyclesSpec } from './checks/import-cycles';
+import { importCrossSliceSpec } from './checks/import-cross-slice';
+import { importCyclesSpec } from './checks/import-cycles';
 import type { ImportCheckSpec } from './checks/import-graph';
-import { importIsolatedGroups, importIsolatedGroupsSpec } from './checks/import-isolated-groups';
-import { importRankSkip, importRankSkipSpec } from './checks/import-rank-skip';
-import { importUphill, importUphillSpec } from './checks/import-uphill';
+import { importIsolatedGroupsSpec } from './checks/import-isolated-groups';
+import { importRankSkipSpec } from './checks/import-rank-skip';
+import { importUphillSpec } from './checks/import-uphill';
 import { instructionSymlinks } from './checks/instruction-symlinks';
 import { migrationsDirectory } from './checks/migrations-directory';
 import { singleStorybook } from './checks/single-storybook';
@@ -29,9 +29,9 @@ export interface RunInput {
 }
 
 /**
- * A check bound to its place in the `checks` map.
+ * What every registered check has, whichever way it runs.
  */
-export interface RegisteredCheck<Name extends CheckName> {
+interface RegisteredCheckBase<Name extends CheckName> {
   readonly name: Name;
   readonly description: string;
   /**
@@ -42,15 +42,29 @@ export interface RegisteredCheck<Name extends CheckName> {
    * Whether the `checks` map turns this check on.
    */
   readonly isEnabled: (checks: ChecksConfig) => boolean;
-  /**
-   * How the check joins a cruise shared with the other import checks, and the options it was enabled with. Present for the import checks only; `run` does the same work for the check alone.
-   */
-  readonly importGraph?: {
+}
+
+/**
+ * A check that runs on its own.
+ */
+export interface StandaloneCheck<Name extends CheckName> extends RegisteredCheckBase<Name> {
+  readonly run: (input: RunInput) => Promise<readonly Violation[]>;
+}
+
+/**
+ * An import check. It has no `run` of its own: it always joins a cruise shared with the other import checks of the run, so there is one path from the registry to dependency-cruiser.
+ */
+export interface ImportGraphCheck<Name extends CheckName> extends RegisteredCheckBase<Name> {
+  readonly importGraph: {
     readonly spec: ImportCheckSpec;
     readonly optionsOf: (checks: ChecksConfig) => ImportGraphOptions | undefined;
   };
-  readonly run: (input: RunInput) => Promise<readonly Violation[]>;
 }
+
+/**
+ * A check bound to its place in the `checks` map.
+ */
+export type RegisteredCheck<Name extends CheckName> = StandaloneCheck<Name> | ImportGraphCheck<Name>;
 
 /**
  * The options of an enabled check, or `undefined` when the setting is absent or `false`.
@@ -64,7 +78,7 @@ function plain<Name extends CheckName, Options>(spec: {
   readonly description: string;
   readonly select: (checks: ChecksConfig) => Options | undefined;
   readonly check: CheckFunction<Options>;
-}): RegisteredCheck<Name> {
+}): StandaloneCheck<Name> {
   return {
     name: spec.name,
     description: spec.description,
@@ -85,26 +99,14 @@ function importCheck<Name extends CheckName>(spec: {
   readonly name: Name;
   readonly description: string;
   readonly select: (checks: ChecksConfig) => ImportGraphOptions | undefined;
-  readonly check: LayoutCheckFunction<ImportGraphOptions>;
   readonly importSpec: ImportCheckSpec;
-}): RegisteredCheck<Name> {
+}): ImportGraphCheck<Name> {
   return {
     name: spec.name,
     description: spec.description,
     requiresLayout: true,
     isEnabled: (checks) => spec.select(checks) !== undefined,
     importGraph: { spec: spec.importSpec, optionsOf: spec.select },
-    run: async ({ cwd, checks, layout }) => {
-      const options = spec.select(checks);
-      if (options === undefined) {
-        throw new ConformanceError(`the check '${spec.name}' is not enabled`);
-      }
-      if (layout === undefined) {
-        throw new ConformanceError(`the check '${spec.name}' reads the workspace layout, which was not supplied`);
-      }
-
-      return spec.check({ cwd, options, layout });
-    },
   };
 }
 
@@ -128,35 +130,30 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     name: 'import-uphill',
     description: 'No package imports a package of a higher rank',
     select: (checks) => enabledOptions(checks['import-uphill']),
-    check: importUphill,
     importSpec: importUphillSpec,
   }),
   'import-rank-skip': importCheck({
     name: 'import-rank-skip',
     description: 'No package imports further below itself than the layout allows',
     select: (checks) => enabledOptions(checks['import-rank-skip']),
-    check: importRankSkip,
     importSpec: importRankSkipSpec,
   }),
   'import-cross-slice': importCheck({
     name: 'import-cross-slice',
     description: 'No package imports a package in a different slice',
     select: (checks) => enabledOptions(checks['import-cross-slice']),
-    check: importCrossSlice,
     importSpec: importCrossSliceSpec,
   }),
   'import-isolated-groups': importCheck({
     name: 'import-isolated-groups',
     description: 'No package imports a package in a group the layout isolates from its own',
     select: (checks) => enabledOptions(checks['import-isolated-groups']),
-    check: importIsolatedGroups,
     importSpec: importIsolatedGroupsSpec,
   }),
   'import-cycles': importCheck({
     name: 'import-cycles',
     description: 'No files of the workspace packages import each other in a cycle',
     select: (checks) => enabledOptions(checks['import-cycles']),
-    check: importCycles,
     importSpec: importCyclesSpec,
   }),
   'instruction-symlinks': plain({
