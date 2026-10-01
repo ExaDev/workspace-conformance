@@ -5,16 +5,17 @@ import { aggregateMappers } from './checks/aggregate-mappers';
 import { commandTypes } from './checks/command-types';
 import { commitTypes } from './checks/commit-types';
 import { dockerfilePackageManager } from './checks/dockerfile-package-manager';
-import { importCrossSlice } from './checks/import-cross-slice';
-import { importCycles } from './checks/import-cycles';
-import { importIsolatedGroups } from './checks/import-isolated-groups';
-import { importRankSkip } from './checks/import-rank-skip';
-import { importUphill } from './checks/import-uphill';
+import { importCrossSlice, importCrossSliceSpec } from './checks/import-cross-slice';
+import { importCycles, importCyclesSpec } from './checks/import-cycles';
+import type { ImportCheckSpec } from './checks/import-graph';
+import { importIsolatedGroups, importIsolatedGroupsSpec } from './checks/import-isolated-groups';
+import { importRankSkip, importRankSkipSpec } from './checks/import-rank-skip';
+import { importUphill, importUphillSpec } from './checks/import-uphill';
 import { instructionSymlinks } from './checks/instruction-symlinks';
 import { singleStorybook } from './checks/single-storybook';
 import type { ChecksConfig } from './config';
 import { ConformanceError } from './errors';
-import type { CheckName } from './options';
+import type { CheckName, ImportGraphOptions } from './options';
 
 /**
  * What a check needs to run once the configuration is loaded.
@@ -40,6 +41,13 @@ export interface RegisteredCheck<Name extends CheckName> {
    * Whether the `checks` map turns this check on.
    */
   readonly isEnabled: (checks: ChecksConfig) => boolean;
+  /**
+   * How the check joins a cruise shared with the other import checks, and the options it was enabled with. Present for the import checks only; `run` does the same work for the check alone.
+   */
+  readonly importGraph?: {
+    readonly spec: ImportCheckSpec;
+    readonly optionsOf: (checks: ChecksConfig) => ImportGraphOptions | undefined;
+  };
   readonly run: (input: RunInput) => Promise<readonly Violation[]>;
 }
 
@@ -72,17 +80,19 @@ function plain<Name extends CheckName, Options>(spec: {
   };
 }
 
-function withLayout<Name extends CheckName, Options>(spec: {
+function importCheck<Name extends CheckName>(spec: {
   readonly name: Name;
   readonly description: string;
-  readonly select: (checks: ChecksConfig) => Options | undefined;
-  readonly check: LayoutCheckFunction<Options>;
+  readonly select: (checks: ChecksConfig) => ImportGraphOptions | undefined;
+  readonly check: LayoutCheckFunction<ImportGraphOptions>;
+  readonly importSpec: ImportCheckSpec;
 }): RegisteredCheck<Name> {
   return {
     name: spec.name,
     description: spec.description,
     requiresLayout: true,
     isEnabled: (checks) => spec.select(checks) !== undefined,
+    importGraph: { spec: spec.importSpec, optionsOf: spec.select },
     run: async ({ cwd, checks, layout }) => {
       const options = spec.select(checks);
       if (options === undefined) {
@@ -113,35 +123,40 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     select: (checks) => enabledOptions(checks['command-types']),
     check: commandTypes,
   }),
-  'import-uphill': withLayout({
+  'import-uphill': importCheck({
     name: 'import-uphill',
     description: 'No package imports a package of a higher rank',
     select: (checks) => enabledOptions(checks['import-uphill']),
     check: importUphill,
+    importSpec: importUphillSpec,
   }),
-  'import-rank-skip': withLayout({
+  'import-rank-skip': importCheck({
     name: 'import-rank-skip',
     description: 'No package imports further below itself than the layout allows',
     select: (checks) => enabledOptions(checks['import-rank-skip']),
     check: importRankSkip,
+    importSpec: importRankSkipSpec,
   }),
-  'import-cross-slice': withLayout({
+  'import-cross-slice': importCheck({
     name: 'import-cross-slice',
     description: 'No package imports a package in a different slice',
     select: (checks) => enabledOptions(checks['import-cross-slice']),
     check: importCrossSlice,
+    importSpec: importCrossSliceSpec,
   }),
-  'import-isolated-groups': withLayout({
+  'import-isolated-groups': importCheck({
     name: 'import-isolated-groups',
     description: 'No package imports a package in a group the layout isolates from its own',
     select: (checks) => enabledOptions(checks['import-isolated-groups']),
     check: importIsolatedGroups,
+    importSpec: importIsolatedGroupsSpec,
   }),
-  'import-cycles': withLayout({
+  'import-cycles': importCheck({
     name: 'import-cycles',
     description: 'No files of the workspace packages import each other in a cycle',
     select: (checks) => enabledOptions(checks['import-cycles']),
     check: importCycles,
+    importSpec: importCyclesSpec,
   }),
   'instruction-symlinks': plain({
     name: 'instruction-symlinks',

@@ -72,7 +72,7 @@ The tool fails loudly, with a configuration error, on what it cannot judge: a pa
 
 ### Import graph
 
-The import checks generate dependency-cruiser rules from the layout in a pure function, cruise the packages' files once per check, and read `summary.violations`. They never use the exit code of `cruise()`, which is 0 whatever it found. A rule cannot compare ranks, so the ordering is expanded into path alternations at generation time: one rule per rank, slice or group pair rather than per package pair.
+The import checks generate dependency-cruiser rules from the layout in a pure function, cruise the packages' files, and read `summary.violations`. Every enabled import check adds its rules to a single cruise, and the findings are split back to the checks by rule name; checks whose `exclude`, `doNotFollow` and `tsConfig` are equal (after defaults) share a cruise, and checks that differ in any of them are cruised separately, since those options decide which files the graph contains. They never use the exit code of `cruise()`, which is 0 whatever it found. A rule cannot compare ranks, so the ordering is expanded into path alternations at generation time: one rule per rank, slice or group pair rather than per package pair.
 
 All import checks take these options:
 
