@@ -1,3 +1,21 @@
+# [1.1.0](https://github.com/ExaDev/workspace-conformance/compare/v1.0.0...v1.1.0) (2026-10-01)
+
+
+### Bug Fixes
+
+* allow one import check to repeat a rule name ([44e0a93](https://github.com/ExaDev/workspace-conformance/commit/44e0a93cb3b05023e3751abb062a07917532dd6c))
+* reject an empty drizzle out as a configuration error ([552381d](https://github.com/ExaDev/workspace-conformance/commit/552381dbdceb67bc718dfe609486478a19ce4b7e))
+
+
+### Features
+
+* cross-check the migrations directory of a generator and a deploy tool ([6f8f978](https://github.com/ExaDev/workspace-conformance/commit/6f8f978988a8fffa4f1e1e97ccb29dcc57928fa7))
+
+
+### Performance Improvements
+
+* cruise once for the import checks that share graph options ([5f2aa57](https://github.com/ExaDev/workspace-conformance/commit/5f2aa574d15e5998ec0a03166c3bccd614ab6e28))
+
 # 1.0.0 (2026-09-30)
 
 

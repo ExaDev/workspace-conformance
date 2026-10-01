@@ -1,7 +1,7 @@
 {
   "name": "workspace-conformance",
   "description": "Conformance checks for a pnpm workspace that ESLint cannot express: type-graph, import-graph and cross-file checks driven by the shared layout section of @exadev/config",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "bin": {
     "workspace-conformance": "./dist/cli.js"
   },
