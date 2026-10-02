@@ -504,16 +504,17 @@ jobs:
     const cwd = await makeTempDir();
     const publish = (command: string): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${command}\n`;
     const publishes = ['pnpm publish -r', 'pnpm -r publish', 'pnpm --filter example-package publish', 'pnpm --filter=example-package publish', 'npm -w packages/example publish'];
-    const notPublishes = ['pnpm -r exec echo publish'];
+    const releaseTools = ['semantic-release', 'pnpm semantic-release', 'pnpm exec semantic-release', 'npx semantic-release', 'changeset publish', 'pnpm changeset publish', 'yarn changeset publish', 'pnpm exec changeset publish', 'npx changeset publish', 'lerna publish'];
+    const notPublishes = ['pnpm -r exec echo publish', 'pnpm changeset version'];
     const reported: string[] = [];
-    for (const command of [...publishes, ...notPublishes]) {
+    for (const command of [...publishes, ...releaseTools, ...notPublishes]) {
       await writeFiles(cwd, { [CI]: publish(command) });
       if ((await workflowCredentials({ cwd, options: {} })).length > 0) {
         reported.push(command);
       }
     }
 
-    expect(reported).toEqual(publishes);
+    expect(reported).toEqual([...publishes, ...releaseTools]);
   });
 
   it('reads a publish command only where a command starts, and the permissions a job declares in place of the workflow', async () => {
