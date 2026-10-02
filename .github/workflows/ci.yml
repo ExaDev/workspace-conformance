@@ -180,14 +180,14 @@ jobs:
       id-token: write # OIDC identity for npm trusted publishing and provenance (no NPM_TOKEN)
     steps:
       # main's own ruleset requires the "Required Checks" status and blocks direct pushes, and the default GITHUB_TOKEN has no way to bypass a repository ruleset (GitHub does not support naming the github-actions[bot] identity as a bypass actor at all), so semantic-release's own release-commit and tag push needs a bypass identity. A deploy key with write access, added as a DeployKey bypass actor on the ruleset, is the lightest-weight one: repo-scoped, no GitHub App installation to manage, no personal or org-admin credential involved.
-      # The key is a durable credential that can push straight to main, so it exists on disk only for the semantic-release step. The checkout gets no ssh-key and persists nothing (persist-credentials false removes the token from git config after its fetch, and with no ssh-key checkout writes no core.sshCommand), so the third-party actions, the dependency install and the npm upgrade below run with no write-capable credential reachable from git config.
-      - uses: actions/checkout@v7
+      # The actions in this job are pinned by commit SHA (the version is in the trailing comment) so that a moved tag cannot run attacker code in a job that holds id-token: write and, later, the deploy key. The key is a durable credential that can push straight to main, so it exists on disk only for the semantic-release step. The checkout gets no ssh-key and persists nothing (persist-credentials false removes the token from git config after its fetch, and with no ssh-key checkout writes no core.sshCommand), so the third-party actions, the dependency install and the npm upgrade below run with no write-capable credential reachable from git config.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # semantic-release analyses the full commit history since the last release.
           fetch-depth: 0
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '22'
           cache: pnpm
