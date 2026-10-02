@@ -184,6 +184,23 @@ jobs:
     expect(where(await workflowJobOrdering({ cwd, options: {} }))).toEqual([`workflow-job-ordering/junction-missing-need ${CI}:4`, `workflow-job-ordering/junction-missing-need ${CI}:4`]);
   });
 
+  it('reads the structure of an if: an && needs one operand that keeps a job off pull requests, an || needs every operand to', async () => {
+    const cwd = await makeTempDir();
+    const exempt = ["github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')", "${{ (github.event_name == 'push') }}", "(github.ref == 'refs/heads/main') && (github.actor == 'a')"];
+    const required = ["(github.ref == 'refs/heads/main' || github.actor == 'a') && github.actor == 'b'", "(github.ref == 'refs/heads/main') || (github.actor == 'a')"];
+    const reported: string[] = [];
+    for (const condition of [...exempt, ...required]) {
+      await writeFiles(cwd, {
+        [CI]: `on: [push, pull_request]\njobs:\n  required-checks:\n    if: always()\n    runs-on: ubuntu-latest\n    steps:\n      - run: test "\${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" != true\n  other:\n    if: "${condition.replaceAll('"', '\\"')}"\n    runs-on: ubuntu-latest\n`,
+      });
+      if ((await workflowJobOrdering({ cwd, options: {} })).length > 0) {
+        reported.push(condition);
+      }
+    }
+
+    expect(reported).toEqual(required);
+  });
+
   it('does not require the junction job to wait for a job that needs it', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, {
