@@ -40,6 +40,7 @@ describe('conformanceSchema', () => {
         'settings-merge-methods': { repository: 'example-org/example-repo', branch: 'main', allowed: 'rebase' },
         'settings-required-checks': { repository: 'example-org/example-repo', junctionJobs: ['gate'], workflows: ['.github/workflows/*.yml'] },
         'settings-review-thread-resolution': {},
+        eslint: { samples: ['src/index.ts', { path: 'package.json', rules: { 'no-console': 'warn' } }], rules: { 'no-console': 'error' }, configFile: 'eslint.config.ts', lint: true, lintPatterns: ['src'] },
         'migrations-directory': {
           generator: 'drizzle-kit',
           deployTool: 'wrangler',
@@ -81,6 +82,14 @@ describe('conformanceSchema', () => {
     expect(await issuesOf({ checks: { 'migrations-directory': { generator: 'drizzle-kit' } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'migrations-directory': { generator: 'prisma', deployTool: 'wrangler' } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'migrations-directory': { generator: 'drizzle-kit', deployTool: 'flyway' } } })).toBeDefined();
+  });
+
+  it('rejects an eslint check without samples, with a required severity other than warn or error, or with an unknown sample key', async () => {
+    expect(await issuesOf({ checks: { eslint: {} } })).toBeDefined();
+    expect(await issuesOf({ checks: { eslint: { samples: [] } } })).toBeDefined();
+    expect(await issuesOf({ checks: { eslint: { samples: ['a.js'], rules: { 'no-console': 'off' } } } })).toBeDefined();
+    expect(await issuesOf({ checks: { eslint: { samples: [{ path: 'a.js', except: ['x'] }] } } })).toBeDefined();
+    expect(await issuesOf({ checks: { eslint: { samples: ['a.js'], lint: 'yes' } } })).toBeDefined();
   });
 
   it('rejects empty paths, empty lists of globs and options of the wrong type', async () => {

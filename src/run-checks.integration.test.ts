@@ -64,6 +64,16 @@ describe('runChecks with the sections supplied', () => {
     await expect(runChecks({ cwd: clean, config: { checks: { 'import-uphill': {} } }, layout: importsLayout, checks: ['import-cycles'] })).rejects.toThrow('import-cycles is not enabled');
   });
 
+  it('runs the eslint check from the registry against the repository own ESLint', async () => {
+    const options = { samples: ['src/index.js'], rules: { 'no-console': 'error' } } as const;
+    const passing = await runChecks({ cwd: fixturePath('eslint', 'clean'), config: { checks: { eslint: options } } });
+    const failing = await runChecks({ cwd: fixturePath('eslint', 'violating'), config: { checks: { eslint: options } } });
+
+    expect(passing.exitCode).toBe(EXIT_CODES.clean);
+    expect(failing.violations.map((violation) => violation.code)).toEqual(['eslint/rule-too-weak']);
+    expect(failing.exitCode).toBe(EXIT_CODES.violations);
+  });
+
   it('needs no layout for checks that do not read it', async () => {
     const result = await runChecks({ cwd: fixturePath('storybook', 'clean'), config: { checks: { 'single-storybook': {} } } });
 
