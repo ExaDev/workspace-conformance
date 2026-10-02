@@ -197,7 +197,7 @@ jobs:
       - run: pnpm build
       - run: pnpm exec publint
       - run: pnpm exec attw --pack
-      # An explicit version, not npm@latest: a floating tag would run whatever was published last in this job, before the release credentials exist. The pin is at least the 11.5.1 that OIDC trusted publishing needs and older than the machine-wide seven-day release-age gate. Raise it deliberately, through the same gate.
+      # An explicit version, not npm@latest: a floating tag would run whatever was published last in this job, before the release credentials exist. The pin is at least the 11.5.1 that OIDC trusted publishing needs and was chosen through the maintainer's seven-day release-age gate; the runner enforces no such gate itself. Raise it deliberately, through the same gate.
       - name: Upgrade npm for OIDC trusted publishing (needs npm CLI >=11.5.1)
         run: npm install -g npm@11.20.0
       # Immediately before the release step, with no other action between them. The secret reaches this step only through env, and the file is mode 600 under runner.temp. known_hosts pins GitHub's published ed25519 host key (SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU, from https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints and the `ssh_keys` of https://api.github.com/meta), so StrictHostKeyChecking=yes can be used and a first-connect accept-new trust is not needed.
