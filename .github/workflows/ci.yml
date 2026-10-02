@@ -210,7 +210,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/release-deploy-key" "$RUNNER_TEMP/release-known-hosts"
         env:
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
-      # semantic-release dry-run pushes to repositoryUrl (the SSH form in release.config.ts) and, only if that fails, silently rewrites it to https with GITHUB_TOKEN embedded, which the ruleset rejects, and only at the final push, after npm publish. The explicit dry-run push below fails the step before anything is published when the key does not authenticate. It is forced because it only has to prove the key can open git-receive-pack: a plain dry-run is rejected as non-fast-forward when a later merge has moved main past this run's commit (runs on main queue rather than cancel), whereas semantic-release itself handles that case by declining to publish. The URL must match repositoryUrl in release.config.ts.
+      # semantic-release dry-run pushes to repositoryUrl (the SSH form in release.config.ts) and, only if that fails, silently rewrites it to https with GITHUB_TOKEN embedded, which the ruleset rejects, and only at the final push, after npm publish. The explicit dry-run push below fails the step before anything is published when the key does not authenticate, and GIT_ALLOW_PROTOCOL=ssh stops the https fallback from being used if a later SSH connection fails. It is forced because it only has to prove the key can open git-receive-pack: a plain dry-run is rejected as non-fast-forward when a later merge has moved main past this run's commit (runs on main queue rather than cancel), whereas semantic-release itself handles that case by declining to publish. The URL must match repositoryUrl in release.config.ts.
       - name: Release
         # HUSKY=0 so the commit-msg hook never fires against the automated release commit.
         run: |
@@ -225,6 +225,8 @@ jobs:
           NODE_AUTH_TOKEN: ''
           # npm publish must not run package.json lifecycle scripts (prepublishOnly) while the deploy key is reachable; the build was done before the key was provisioned.
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+          # Fails closed: semantic-release's own SSH check is a separate connection from the preflight, and when it fails it silently switches to an https URL carrying GITHUB_TOKEN, whose dry-run succeeds because dry-runs do not evaluate rulesets, so npm would publish before the final push is rejected. With only ssh allowed git refuses that URL before anything is published.
+          GIT_ALLOW_PROTOCOL: ssh
       - name: Remove the release deploy key
         if: always()
         run: rm -f "$RUNNER_TEMP/release-deploy-key" "$RUNNER_TEMP/release-known-hosts"
