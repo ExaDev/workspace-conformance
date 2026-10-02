@@ -500,6 +500,25 @@ jobs:
     expect(where(await workflowCredentials({ cwd, options: {} }))).toEqual([`workflow-credentials/tokenless-publish-unprotected ${CI}:8`]);
   });
 
+  it('accepts provenance asked for by a flag or NPM_CONFIG_PROVENANCE, and not one switched off with --provenance=false', async () => {
+    const cwd = await makeTempDir();
+    const publish = (command: string, env = ''): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${command}\n${env}`;
+    const results: Record<string, number> = {};
+    const cases: readonly (readonly [string, string, string?])[] = [
+      ['flag', 'npm publish --provenance'],
+      ['flag with value', 'npm publish --provenance=true'],
+      ['switched off', 'npm publish --provenance=false'],
+      ['environment', 'npm publish', '        env:\n          NPM_CONFIG_PROVENANCE: true\n'],
+      ['environment off', 'npm publish', '        env:\n          NPM_CONFIG_PROVENANCE: false\n'],
+    ];
+    for (const [name, command, env] of cases) {
+      await writeFiles(cwd, { [CI]: publish(command, env) });
+      results[name] = (await workflowCredentials({ cwd, options: {} })).length;
+    }
+
+    expect(results).toEqual({ flag: 0, 'flag with value': 0, 'switched off': 1, environment: 0, 'environment off': 1 });
+  });
+
   it('reads a publish with package manager options before the subcommand, as a workspace publish is written', async () => {
     const cwd = await makeTempDir();
     const publish = (command: string): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${command}\n`;
