@@ -3,6 +3,7 @@ export { aggregateMappers } from './checks/aggregate-mappers';
 export { commandTypes, DEFAULT_INFERENCES } from './checks/command-types';
 export { commitTypes, PRESET_COMMIT_TYPES } from './checks/commit-types';
 export { dockerfilePackageManager } from './checks/dockerfile-package-manager';
+export { eslint } from './checks/eslint';
 export { importCrossSlice } from './checks/import-cross-slice';
 export { importCycles } from './checks/import-cycles';
 export { importIsolatedGroups } from './checks/import-isolated-groups';
@@ -33,6 +34,9 @@ export type {
   CommandTypesOptions,
   CommitTypesOptions,
   DockerfilePackageManagerOptions,
+  EslintOptions,
+  EslintRequiredSeverity,
+  EslintSample,
   ImportGraphOptions,
   InstructionSymlinksOptions,
   MigrationsDirectoryOptions,

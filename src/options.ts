@@ -132,6 +132,51 @@ export interface DockerfilePackageManagerOptions {
 }
 
 /**
+ * The severity a rule must have at least: `warn` is met by `warn` or `error`, `error` only by `error`.
+ */
+export type EslintRequiredSeverity = 'warn' | 'error';
+
+/**
+ * A file whose resolved ESLint configuration is checked.
+ */
+export interface EslintSample {
+  /**
+   * The file ESLint would lint, relative to the directory the checks run in. It need not exist: ESLint resolves a file's configuration from its path alone.
+   */
+  readonly path: string;
+  /**
+   * Rules required for this file on top of the check's `rules`, which this file's entries override.
+   */
+  readonly rules?: Readonly<Record<string, EslintRequiredSeverity>>;
+}
+
+/**
+ * Options of the `eslint` check: the repository's own ESLint, resolved from the directory the checks run in, lints the sample files with the required rules.
+ */
+export interface EslintOptions {
+  /**
+   * One file per kind of source the repository lints (`src/index.ts`, `package.json`, `eslint.config.ts`). A bare string is `{ path }`. Each must be linted: not ignored, and matched by a configuration block.
+   */
+  readonly samples: readonly (string | EslintSample)[];
+  /**
+   * Rules required for every sample, with the severity each must have at least.
+   */
+  readonly rules?: Readonly<Record<string, EslintRequiredSeverity>>;
+  /**
+   * The config file under test, relative to the directory the checks run in, instead of the one ESLint finds from there.
+   */
+  readonly configFile?: string;
+  /**
+   * Also lint the workspace and report every message ESLint produces. Off when omitted: the default level lints nothing and only reads resolved configuration.
+   */
+  readonly lint?: boolean;
+  /**
+   * What the full level lints, as file and directory patterns relative to the directory the checks run in. `.` when omitted. Used only with `lint`.
+   */
+  readonly lintPatterns?: readonly string[];
+}
+
+/**
  * Options of the `migrations-directory` check: the directory a schema generator writes migrations to is the one the deploy tool applies them from, and no script applies them with the generator.
  */
 export interface MigrationsDirectoryOptions {
@@ -344,6 +389,7 @@ export interface CheckOptionsByName {
   readonly 'commit-types': CommitTypesOptions;
   readonly 'dockerfile-package-manager': DockerfilePackageManagerOptions;
   readonly 'migrations-directory': MigrationsDirectoryOptions;
+  readonly eslint: EslintOptions;
   readonly 'workflow-job-ordering': WorkflowJobOrderingOptions;
   readonly 'workflow-skippable-jobs': WorkflowSkippableJobsOptions;
   readonly 'workflow-runner-resolution': WorkflowRunnerResolutionOptions;

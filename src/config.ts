@@ -36,6 +36,9 @@ function compiles(source: string): boolean {
 const pattern = z.string().min(1).refine(compiles, 'not a valid regular expression');
 const patterns = z.array(pattern);
 
+const severity = z.enum(['warn', 'error']);
+const requiredRules = z.record(z.string().min(1), severity);
+
 const selection = { workflows: z.exactOptional(paths), exclude: z.exactOptional(paths) };
 const pinningLevel = z.enum(['sha', 'ref']);
 const settings = { repository: z.exactOptional(z.string().regex(/^[^/\s]+\/[^/\s]+$/u, 'expected owner/name')), branch: z.exactOptional(z.string().min(1)) };
@@ -83,6 +86,17 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
   'single-storybook': z.exactOptional(enabled(z.strictObject({ location: z.exactOptional(path), exclude: z.exactOptional(paths) }))),
   'commit-types': z.exactOptional(enabled(z.strictObject({ commitlint: z.exactOptional(path), release: z.exactOptional(path) }))),
   'dockerfile-package-manager': z.exactOptional(enabled(z.strictObject({ dockerfiles: z.exactOptional(paths), exclude: z.exactOptional(paths), packageJson: z.exactOptional(path) }))),
+  eslint: z.exactOptional(
+    enabled(
+      z.strictObject({
+        samples: z.array(z.union([path, z.strictObject({ path, rules: z.exactOptional(requiredRules) })])).min(1),
+        rules: z.exactOptional(requiredRules),
+        configFile: z.exactOptional(path),
+        lint: z.exactOptional(z.boolean()),
+        lintPatterns: z.exactOptional(paths),
+      }),
+    ),
+  ),
   'migrations-directory': z.exactOptional(
     enabled(
       z.strictObject({

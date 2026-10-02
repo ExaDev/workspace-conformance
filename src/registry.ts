@@ -23,6 +23,7 @@ import type { ImportCheckSpec } from './checks/import-graph';
 import { importIsolatedGroupsSpec } from './checks/import-isolated-groups';
 import { importRankSkipSpec } from './checks/import-rank-skip';
 import { importUphillSpec } from './checks/import-uphill';
+import { eslint } from './checks/eslint';
 import { instructionSymlinks } from './checks/instruction-symlinks';
 import { migrationsDirectory } from './checks/migrations-directory';
 import { singleStorybook } from './checks/single-storybook';
@@ -234,6 +235,12 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: "The directory a schema generator writes migrations to is the one the deploy tool applies them from, and no script applies them with the generator",
     select: (checks) => enabledOptions(checks['migrations-directory']),
     check: migrationsDirectory,
+  }),
+  eslint: plain({
+    name: 'eslint',
+    description: "The repository's own ESLint lints the sample files with the required rules enabled at the required severity",
+    select: (checks) => enabledOptions(checks.eslint),
+    check: eslint,
   }),
   'workflow-job-ordering': plain({
     name: 'workflow-job-ordering',
