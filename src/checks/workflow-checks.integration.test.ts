@@ -731,6 +731,20 @@ describe('workflow-update-bot-cooldown', () => {
     expect(await workflowUpdateBotCooldown({ cwd, options: { dependabot: 'bot/dependabot.yaml' } })).toEqual([]);
   });
 
+  it('reports a Renovate minimumReleaseAge that waits for nothing, like a Dependabot cooldown of zero days', async () => {
+    const cwd = await makeTempDir();
+
+    for (const config of ['{ "minimumReleaseAge": "0 days" }', '{ "minimumReleaseAge": null }', '{ "packageRules": [{ "minimumReleaseAge": "0 days" }] }']) {
+      await writeFiles(cwd, { 'renovate.json': config });
+
+      expect(where(await workflowUpdateBotCooldown({ cwd, options: {} }))).toEqual(['workflow-update-bot-cooldown/renovate-no-minimum-release-age renovate.json']);
+    }
+
+    await writeFiles(cwd, { 'renovate.json': '{ "minimumReleaseAge": "3 days" }' });
+
+    expect(await workflowUpdateBotCooldown({ cwd, options: {} })).toEqual([]);
+  });
+
   it('fails on a config named in the options that does not exist or does not parse', async () => {
     const cwd = await makeTempDir();
 
