@@ -204,6 +204,28 @@ jobs:
     expect(await workflowJobOrdering({ cwd, options: {} })).toEqual([]);
   });
 
+  it('reports a junction job that fails on a skipped result read from one job, as well as from needs.*.result', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      [CI]: `
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+  required-checks:
+    needs: [test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [[ "\${{ needs.test.result }}" != "success" ]] && exit 1
+          echo 'failure' 'cancelled'
+`,
+    });
+
+    expect(where(await workflowJobOrdering({ cwd, options: {} }))).toEqual([`workflow-job-ordering/junction-fails-on-skipped ${CI}:6`]);
+  });
+
   it('does not judge a role that has no job in the workflow', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, { [CI]: 'on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n' });

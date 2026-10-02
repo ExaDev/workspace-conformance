@@ -27,7 +27,7 @@ function decisionText(job: Job): string {
 const RESULT_SOURCE = /needs\.(?:\*|[\w-]+)\.result|toJSON\(\s*needs\s*\)/u;
 const FAILURE_WORD = /['"]failure['"]/u;
 const CANCELLED_WORD = /['"]cancelled['"]/u;
-const SKIPPED_OR_NOT_SUCCESS = /needs\.\*\.result[^\n]*(?:['"]skipped['"]|!==?\s*['"]success['"])|!\s*contains\(\s*needs\.\*\.result\s*,\s*['"]success['"]/u;
+const SKIPPED_OR_NOT_SUCCESS = /needs\.(?:\*|[\w-]+)\.result[^\n]*(?:['"]skipped['"]|!==?\s*['"]success['"])|!\s*contains\(\s*needs\.\*\.result\s*,\s*['"]success['"]/u;
 
 /**
  * An `if` that compares the ref or the event name.
