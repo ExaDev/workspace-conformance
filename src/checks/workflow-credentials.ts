@@ -37,7 +37,7 @@ const PUBLISH_COMMAND = new RegExp(
  */
 const TOKEN_VARIABLES: readonly string[] = ['NODE_AUTH_TOKEN', 'NPM_TOKEN'];
 
-const PROVENANCE_FLAG = /--provenance(?!=false)(?:=true)?(?:\s|$)/u;
+const PROVENANCE_FLAG = /--provenance(?:=true)?(?:\s|$)/u;
 
 /**
  * Whether the `package.json` in the working directory asks for provenance with `publishConfig.provenance: true`, which applies to every publish of that package.
