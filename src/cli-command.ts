@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { Violation } from './check';
+import { ConformanceError } from './errors';
 import { createGitHubClient, type GitHubClient } from './github';
 import type { CheckName } from './options';
 import { checkNames, isCheckName, registry } from './registry';
@@ -49,12 +50,12 @@ function requestedChecks(names: readonly string[]): readonly CheckName[] {
 }
 
 /**
- * The client the settings checks read through, authenticated by the token in `GITHUB_TOKEN` or `GH_TOKEN`.
+ * The client the settings checks read through, authenticated by the first non-empty token of `GITHUB_TOKEN` and `GH_TOKEN`.
  */
 function clientFromEnvironment(): GitHubClient {
-  const token = process.env['GITHUB_TOKEN'] ?? process.env['GH_TOKEN'];
-  if (token === undefined || token === '') {
-    throw new TypeError('--settings needs a token in GITHUB_TOKEN or GH_TOKEN');
+  const token = [process.env['GITHUB_TOKEN'], process.env['GH_TOKEN']].find((value) => value !== undefined && value !== '');
+  if (token === undefined) {
+    throw new ConformanceError('--settings needs a token in GITHUB_TOKEN or GH_TOKEN');
   }
 
   return createGitHubClient({ token });
