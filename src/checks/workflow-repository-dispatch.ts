@@ -8,7 +8,10 @@ const DEFAULT_BRANCHES: readonly string[] = ['main', 'master'];
 const DEFAULT_BRANCH_EXPRESSION = /\$\{\{\s*github\.event\.repository\.default_branch\s*\}\}/u;
 const DEFAULT_TOKEN = /\b(?:secrets\.GITHUB_TOKEN|github\.token)\b/u;
 
-const PUSH = /^git\s+push\b(.*)$/u;
+/**
+ * The start of a `git push` command: `git`, the global options that take a value (`-C <directory>`, `-c <name=value>`) or are written `--name=value`, then `push`.
+ */
+const PUSH = /^git(?:\s+(?:-[Cc]\s+\S+|--[\w-]+=\S+))*\s+push\b/u;
 const BRANCH_CREATION = /^git\s+(?:checkout\s+-[bB]|switch\s+-[cC])\b/u;
 const AUTO_MERGE = /^gh\s+pr\s+merge\b.*\s--auto\b/u;
 const PULL_REQUEST_CREATION = /^gh\s+pr\s+create\b|^gh\s+api\b.*\brepos\/[^\s]+\/pulls\b/u;
@@ -43,18 +46,25 @@ const PUSH_OPTIONS_WITH_VALUE: ReadonlySet<string> = new Set(['-o', '--push-opti
 const URL_WITH_CREDENTIALS = /[a-z][a-z0-9+.-]*:\/\/(?:[^\s/@{]|\$\{\{[^}]*\}\})*@/iu;
 
 /**
+ * The words of a `git push` command line after `push`, without the quotes that wrap a word.
+ */
+function pushWords(line: string): readonly string[] {
+  return line
+    .replace(PUSH, '')
+    .split(/\s+/u)
+    .map((word) => word.replace(/^(["'])(.*)\1$/u, '$2'))
+    .filter((word) => word !== '');
+}
+
+/**
  * The refspecs of a `git push` command line, after the remote, the options and the values of the options that take one.
  */
 function pushRefspecs(line: string): readonly string[] {
-  const words = (PUSH.exec(line)?.[1] ?? '').split(/\s+/u).filter((word) => word !== '');
   const positional: string[] = [];
-  for (let index = 0; index < words.length; index += 1) {
-    const word = words[index];
-    if (word === undefined) {
-      continue;
-    }
+  const words = pushWords(line)[Symbol.iterator]();
+  for (const word of words) {
     if (PUSH_OPTIONS_WITH_VALUE.has(word)) {
-      index += 1;
+      words.next();
     } else if (!word.startsWith('-')) {
       positional.push(word);
     }
@@ -156,7 +166,7 @@ function jobViolations(context: Context): readonly Violation[] {
  *
  * `workflow-repository-dispatch/pushes-default-branch`: a `git push` to the default branch, or one with no refspec while the default branch is checked out, or `git-auto-commit-action` on it. `auto-merge-without-required-checks`: `gh pr merge --auto`, which merges at once when the base branch requires no checks (the file cannot show the rule; `assumeRequiredChecks` states it, and `settings-required-checks` verifies it). `default-token-triggers-nothing`: a push (the checkout leaves `GITHUB_TOKEN` in git config unless it is given a `token`, and a push to a URL carrying its own credentials does not use it) or a pull request opened as `GITHUB_TOKEN`; events created with it start no workflows, apart from `workflow_dispatch` and `repository_dispatch`, so the pushed commit gets no checks. `dispatch-other-repository-with-default-token`: a dispatch to a repository other than `github.repository` with `GITHUB_TOKEN`, whose access is limited to its own repository. Dispatching in the same repository with `GITHUB_TOKEN` is allowed by GitHub and is not reported.
  *
- * Limits: commands are read as text, so a script file or composite action is not seen; a push is judged by its command line, so a branch created by a helper is not seen; a dispatch target written literally as this repository's own name is reported, since the file does not know the name; a job that calls a reusable workflow is not read.
+ * Limits: commands are read as text, so a script file or composite action is not seen; a push is judged by its command line, so a branch created by a helper is not seen, and a quoted word that contains a space is not read as one word; a dispatch target written literally as this repository's own name is reported, since the file does not know the name; a job that calls a reusable workflow is not read.
  */
 export const workflowRepositoryDispatch: CheckFunction<WorkflowRepositoryDispatchOptions> = async ({ cwd, options }) =>
   (await loadWorkflows(cwd, options))

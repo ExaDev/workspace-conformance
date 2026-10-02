@@ -596,6 +596,47 @@ describe('workflow-repository-dispatch', () => {
     );
   });
 
+  it('reads a push to the default branch through quotes and git global options', async () => {
+    const cwd = await makeTempDir();
+    const handler = (command: string): string => `on: repository_dispatch\njobs:\n  update:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          token: \${{ secrets.APP_TOKEN }}\n      - run: ${command}\n`;
+    const pushes = ['git push origin "HEAD:main"', "git push origin 'main'", 'git -C . push origin main', 'git -c user.name=bot push origin main', 'git push origin main 2>&1'];
+    const notPushes = ["git push origin 'update'", 'git -C . push origin update'];
+    const reported: string[] = [];
+    for (const command of [...pushes, ...notPushes]) {
+      await writeFiles(cwd, { [CI]: handler(command) });
+      if ((await workflowRepositoryDispatch({ cwd, options: {} })).some((violation) => violation.code === 'workflow-repository-dispatch/pushes-default-branch')) {
+        reported.push(command);
+      }
+    }
+
+    expect(reported).toEqual(pushes);
+  });
+
+  it('does not report a push as the default token when the checkout keeps no credentials, and does when it keeps them', async () => {
+    const cwd = await makeTempDir();
+    const handler = (persist: string): string => `on: repository_dispatch\njobs:\n  update:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          persist-credentials: ${persist}\n      - run: git push origin update\n`;
+    await writeFiles(cwd, { [CI]: handler('false') });
+
+    expect(await workflowRepositoryDispatch({ cwd, options: {} })).toEqual([]);
+
+    await writeFiles(cwd, { [CI]: handler('true') });
+
+    expect(where(await workflowRepositoryDispatch({ cwd, options: {} }))).toEqual([`workflow-repository-dispatch/default-token-triggers-nothing ${CI}:9`]);
+  });
+
+  it('allows a dispatch to this repository with the default token and reports one to another repository', async () => {
+    const cwd = await makeTempDir();
+    const handler = (repository: string): string =>
+      `on: repository_dispatch\njobs:\n  update:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: peter-evans/repository-dispatch@v3\n        with:\n          token: \${{ secrets.GITHUB_TOKEN }}\n          repository: ${repository}\n          event-type: again\n`;
+    await writeFiles(cwd, { [CI]: handler('${{ github.repository }}') });
+
+    expect(await workflowRepositoryDispatch({ cwd, options: {} })).toEqual([]);
+
+    await writeFiles(cwd, { [CI]: handler('example-org/other') });
+
+    expect(where(await workflowRepositoryDispatch({ cwd, options: {} }))).toEqual([`workflow-repository-dispatch/dispatch-other-repository-with-default-token ${CI}:6`]);
+  });
+
   it('judges a push without a refspec by the branch the handler has checked out', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, {
