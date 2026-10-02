@@ -59,6 +59,15 @@ async function dependabotViolations(cwd: string, file: string): Promise<readonly
   );
 }
 
+/**
+ * Whether a `minimumReleaseAge` value waits for a positive time: a duration string such as `3 days`, whose number is above zero. `0 days` and `null` (which clears the setting) wait for nothing.
+ */
+function delaysRelease(age: unknown): boolean {
+  const amount = typeof age === 'string' ? /^\s*(\d+(?:\.\d+)?)\s*[a-z]/iu.exec(age)?.[1] : undefined;
+
+  return amount !== undefined && Number(amount) > 0;
+}
+
 function setsMinimumReleaseAge(value: unknown): boolean {
   if (!isRecord(value)) {
     return false;
@@ -67,8 +76,8 @@ function setsMinimumReleaseAge(value: unknown): boolean {
   const presets = Array.isArray(value['extends']) ? value['extends'] : [];
 
   return (
-    value[RENOVATE_SETTING] !== undefined ||
-    rules.some((rule: unknown) => isRecord(rule) && rule[RENOVATE_SETTING] !== undefined) ||
+    delaysRelease(value[RENOVATE_SETTING]) ||
+    rules.some((rule: unknown) => isRecord(rule) && delaysRelease(rule[RENOVATE_SETTING])) ||
     presets.some((preset: unknown) => typeof preset === 'string' && preset.includes(RENOVATE_SETTING))
   );
 }
@@ -83,11 +92,11 @@ async function renovateViolations(cwd: string, file: string): Promise<readonly V
 
   return setsMinimumReleaseAge(value)
     ? []
-    : [{ code: 'workflow-update-bot-cooldown/renovate-no-minimum-release-age', message: `${file} sets no ${RENOVATE_SETTING}, so Renovate proposes a release the day it is published`, file }];
+    : [{ code: 'workflow-update-bot-cooldown/renovate-no-minimum-release-age', message: `${file} sets no ${RENOVATE_SETTING} above zero, so Renovate proposes a release the day it is published`, file }];
 }
 
 /**
- * The update bots wait before proposing a release, so a compromised release is withdrawn before it is installed. Dependabot: every `updates` entry needs a `cooldown` with `default-days` or one of the `semver-*-days` above zero. Renovate: `minimumReleaseAge` must be set at the top level or in a `packageRules` entry.
+ * The update bots wait before proposing a release, so a compromised release is withdrawn before it is installed. Dependabot: every `updates` entry needs a `cooldown` with `default-days` or one of the `semver-*-days` above zero. Renovate: `minimumReleaseAge` must be set to a duration above zero at the top level or in a `packageRules` entry.
  *
  * Limits: the bots' own rules differ, since Dependabot's cooldown does not apply to security updates, and a Renovate preset is not resolved (an `extends` entry counts only when its name contains `minimumReleaseAge`), so a setting that comes from a preset under another name is reported. Renovate configs in JSON5 syntax beyond comments and trailing commas, and a `renovate` key in `package.json`, are not read. A repository with neither bot has nothing to report.
  */
