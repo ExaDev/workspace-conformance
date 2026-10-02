@@ -29,6 +29,8 @@ export const commitTypes: readonly CommitType[] = [
  */
 const config: Options = {
   branches: ['main'],
+  // Deliberately the SSH form, not package.json's own git+https:// repository field (that field stays https://; it is public consumer-facing metadata, unrelated to how this release pushes). semantic-release only embeds an x-access-token:$GITHUB_TOKEN@ credential into an https:// repositoryUrl; the default GITHUB_TOKEN it would embed has no way to bypass main's branch ruleset, so the push is rejected. An SSH URL skips that embedding entirely, so the push authenticates with the deploy key the Release job's checkout wires into core.sshCommand (checkout@v7 writes that config only while persist-credentials is true; see .github/workflows/ci.yml), which the ruleset lists as a DeployKey bypass actor.
+  repositoryUrl: 'git@github.com:ExaDev/workspace-conformance.git',
   plugins: [
     [
       '@semantic-release/commit-analyzer',
