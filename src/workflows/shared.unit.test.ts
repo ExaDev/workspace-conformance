@@ -17,6 +17,12 @@ describe('commandSegments', () => {
     expect(commandSegments('git add . && git commit -m "a; b" || echo \'x | y\'; git push')).toEqual(['git add .', 'git commit -m "a; b"', "echo 'x | y'", 'git push']);
   });
 
+  it('does not split inside an expression or at a redirection', () => {
+    expect(commandSegments('echo ${{ a || b }} && git push origin main 2>&1 | tee log')).toEqual(['echo ${{ a || b }}', 'git push origin main 2>&1', 'tee log']);
+    expect(commandSegments('make &>out.log; make >&2')).toEqual(['make &>out.log', 'make >&2']);
+    expect(commandSegments('sleep 1 & echo ${{ unterminated')).toEqual(['sleep 1', 'echo ${{ unterminated']);
+  });
+
   it('drops the variable assignments that prefix a command', () => {
     expect(commandSegments('HUSKY=0 CI=true pnpm exec semantic-release')).toEqual(['pnpm exec semantic-release']);
   });

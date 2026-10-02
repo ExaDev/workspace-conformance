@@ -38,19 +38,28 @@ export function commandLines(run: string): readonly string[] {
 const LEADING_ASSIGNMENTS = /^(?:[A-Za-z_]\w*=\S*\s+)+/u;
 
 /**
- * The simple commands of a logical line, without the variable assignments that prefix them: it is split at `&&`, `||`, `;`, `|` and `&` that are outside quotes, so text inside a quoted string (an `echo` of a command) is not mistaken for a command.
+ * The simple commands of a logical line, without the variable assignments that prefix them: it is split at `&&`, `||`, `;`, `|` and `&` that are outside quotes and outside `${{ }}` expressions, and that are not part of a redirection (`2>&1`, `&>file`), so text inside a quoted string (an `echo` of a command) is not mistaken for a command.
  */
 export function commandSegments(line: string): readonly string[] {
   const segments: string[] = [];
   let current = '';
   let quote: string | undefined;
-  for (const character of line) {
+  for (let index = 0; index < line.length; index += 1) {
+    const rest = line.slice(index);
+    const character = rest.charAt(0);
     if (quote !== undefined) {
       current += character;
       quote = character === quote ? undefined : quote;
+    } else if (rest.startsWith('${{')) {
+      const end = rest.indexOf('}}');
+      const expression = end === -1 ? rest : rest.slice(0, end + 2);
+      current += expression;
+      index += expression.length - 1;
     } else if (character === '"' || character === "'") {
       current += character;
       quote = character;
+    } else if (character === '&' && (current.endsWith('>') || current.endsWith('<') || rest.startsWith('&>'))) {
+      current += character;
     } else if (character === '&' || character === '|' || character === ';') {
       segments.push(current);
       current = '';
@@ -68,13 +77,6 @@ export function commandSegments(line: string): readonly string[] {
  */
 export function scriptCommands(run: string | undefined): readonly string[] {
   return commandLines(run ?? '').flatMap(commandSegments);
-}
-
-/**
- * The commands of every `run` step of a job.
- */
-export function jobCommands(job: Job): readonly string[] {
-  return job.steps.flatMap((step) => (step.run === undefined ? [] : commandLines(step.run)));
 }
 
 /**
