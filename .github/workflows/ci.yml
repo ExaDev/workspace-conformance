@@ -179,14 +179,13 @@ jobs:
       pull-requests: write # to comment on released pull requests
       id-token: write # OIDC identity for npm trusted publishing and provenance (no NPM_TOKEN)
     steps:
-      # main's own ruleset requires the "Required Checks" status and blocks direct pushes, and the default GITHUB_TOKEN has no way to bypass a repository ruleset (GitHub does not support naming the github-actions[bot] identity as a bypass actor at all), so semantic-release's own release-commit and tag push needs a bypass identity. A deploy key with write access, added as a DeployKey bypass actor on the ruleset, is the lightest-weight one: repo-scoped, no GitHub App installation to manage, no personal or org-admin credential involved. checkout@v7 writes the key into core.sshCommand, where later steps' git commands find it, only when persist-credentials is true (src/git-auth-helper.ts configureSsh gates the config write on settings.persistCredentials; with it false the key exists only as a step-scoped GIT_SSH_COMMAND export no later step inherits, semantic-release's push-URL resolution then finds no key for the SSH repositoryUrl, silently falls back to an https URL with GITHUB_TOKEN embedded, and the ruleset rejects that push). release.config.ts's SSH-form repositoryUrl is what selects the SSH push; persisting credentials is what arms it.
+      # main's own ruleset requires the "Required Checks" status and blocks direct pushes, and the default GITHUB_TOKEN has no way to bypass a repository ruleset (GitHub does not support naming the github-actions[bot] identity as a bypass actor at all), so semantic-release's own release-commit and tag push needs a bypass identity. A deploy key with write access, added as a DeployKey bypass actor on the ruleset, is the lightest-weight one: repo-scoped, no GitHub App installation to manage, no personal or org-admin credential involved.
+      # The key is a durable credential that can push straight to main, so it exists on disk only for the semantic-release step. The checkout gets no ssh-key and persists nothing (persist-credentials false removes the token from git config after its fetch, and with no ssh-key checkout writes no core.sshCommand), so the third-party actions, the dependency install and the npm upgrade below run with no write-capable credential reachable from git config.
       - uses: actions/checkout@v7
         with:
           # semantic-release analyses the full commit history since the last release.
           fetch-depth: 0
-          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
-          # true on purpose (see the comment above): false leaves semantic-release's push with no SSH key, and the ruleset rejects the GITHUB_TOKEN fallback. The persisted token extraheader is inert for this push, which goes to the SSH URL, not an https:// one.
-          persist-credentials: true
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -194,13 +193,32 @@ jobs:
           cache: pnpm
           # registry-url is deliberately absent: trusted publishing needs no registry configuration, and without it setup-node writes no .npmrc with an _authToken line that could carry a stale token if the OIDC exchange fails. (A successful exchange overrides that line, so keeping registry-url would not break publishing.)
       - run: pnpm install --frozen-lockfile
+      # An explicit version, not npm@latest: a floating tag would run whatever was published last in this job, before the release credentials exist. The pin is at least the 11.5.1 that OIDC trusted publishing needs and older than the machine-wide seven-day release-age gate. Raise it deliberately, through the same gate.
       - name: Upgrade npm for OIDC trusted publishing (needs npm CLI >=11.5.1)
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.20.0
+      # Immediately before the release step, with no other action between them. The secret reaches this step only through env, and the file is mode 600 under runner.temp. known_hosts pins GitHub's published ed25519 host key (SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU, from https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints and the `ssh_keys` of https://api.github.com/meta), so StrictHostKeyChecking=yes can be used and a first-connect accept-new trust is not needed.
+      - name: Provision the release deploy key
+        run: |
+          set -eu
+          umask 077
+          printf '%s\n' "$RELEASE_DEPLOY_KEY" > "$RUNNER_TEMP/release-deploy-key"
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$RUNNER_TEMP/release-known-hosts"
+          chmod 600 "$RUNNER_TEMP/release-deploy-key" "$RUNNER_TEMP/release-known-hosts"
+        env:
+          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
+      # semantic-release dry-run pushes to repositoryUrl (the SSH form in release.config.ts) and, only if that fails, silently rewrites it to https with GITHUB_TOKEN embedded, which the ruleset rejects, and only at the final push, after npm publish. The explicit dry-run push below fails the step before anything is published when the key does not authenticate, so that fallback is never reached. The URL must match repositoryUrl in release.config.ts.
       - name: Release
         # HUSKY=0 so the commit-msg hook never fires against the automated release commit.
-        run: HUSKY=0 pnpm exec semantic-release
+        run: |
+          set -eu
+          git push --dry-run --no-verify -- "git@github.com:${GITHUB_REPOSITORY}.git" HEAD:main
+          HUSKY=0 pnpm exec semantic-release
         env:
+          GIT_SSH_COMMAND: ssh -i ${{ runner.temp }}/release-deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${{ runner.temp }}/release-known-hosts
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Blanked, not omitted: an inherited NPM_TOKEN or NODE_AUTH_TOKEN would otherwise be used in preference to the OIDC exchange.
           NPM_TOKEN: ''
           NODE_AUTH_TOKEN: ''
+      - name: Remove the release deploy key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release-deploy-key" "$RUNNER_TEMP/release-known-hosts"
