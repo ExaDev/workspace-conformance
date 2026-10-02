@@ -193,6 +193,10 @@ jobs:
           cache: pnpm
           # registry-url is deliberately absent: trusted publishing needs no registry configuration, and without it setup-node writes no .npmrc with an _authToken line that could carry a stale token if the OIDC exchange fails. (A successful exchange overrides that line, so keeping registry-url would not break publishing.)
       - run: pnpm install --frozen-lockfile
+      # The build and the package checks run here, before the deploy key exists. @semantic-release/npm runs `npm publish`, which would otherwise run package.json's prepublishOnly (lint, typecheck, test, build, publint, attw) with the key on disk and its path in the environment, so every dev dependency would execute beside it. The Release step sets NPM_CONFIG_IGNORE_SCRIPTS so that only semantic-release, its plugins and npm run with the key; dist/ is therefore produced and verified first.
+      - run: pnpm build
+      - run: pnpm exec publint
+      - run: pnpm exec attw --pack
       # An explicit version, not npm@latest: a floating tag would run whatever was published last in this job, before the release credentials exist. The pin is at least the 11.5.1 that OIDC trusted publishing needs and older than the machine-wide seven-day release-age gate. Raise it deliberately, through the same gate.
       - name: Upgrade npm for OIDC trusted publishing (needs npm CLI >=11.5.1)
         run: npm install -g npm@11.20.0
@@ -219,6 +223,8 @@ jobs:
           # Blanked, not omitted: an inherited NPM_TOKEN or NODE_AUTH_TOKEN would otherwise be used in preference to the OIDC exchange.
           NPM_TOKEN: ''
           NODE_AUTH_TOKEN: ''
+          # npm publish must not run package.json lifecycle scripts (prepublishOnly) while the deploy key is reachable; the build was done before the key was provisioned.
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
       - name: Remove the release deploy key
         if: always()
         run: rm -f "$RUNNER_TEMP/release-deploy-key" "$RUNNER_TEMP/release-known-hosts"
