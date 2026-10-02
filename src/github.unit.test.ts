@@ -40,6 +40,14 @@ describe('createGitHubClient', () => {
     ]);
   });
 
+  it('rejects with a ConformanceError that names the cause when the token cannot see the merge-method settings', async () => {
+    const { fetch: fake } = fakeFetch([{ default_branch: 'main' }, { default_branch: 'main' }]);
+    const client = createGitHubClient({ token: 't', fetch: fake });
+
+    await expect(client.repository(SLUG)).rejects.toThrow(ConformanceError);
+    await expect(client.repository(SLUG)).rejects.toThrow(/write access/u);
+  });
+
   it('reduces the rules of a branch to the required checks and the pull request rules, whichever ruleset they come from', async () => {
     const { fetch: fake, calls } = fakeFetch([
       [
