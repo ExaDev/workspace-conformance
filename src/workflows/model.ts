@@ -371,9 +371,10 @@ export function parseUses(uses: string): UsesReference {
     return { kind: 'local', path: uses };
   }
   if (uses.startsWith('docker://')) {
-    const [image, digest] = uses.slice('docker://'.length).split('@');
+    const reference = uses.slice('docker://'.length);
+    const at = reference.indexOf('@');
 
-    return { kind: 'docker', image: image ?? '', digest };
+    return at === -1 ? { kind: 'docker', image: reference, digest: undefined } : { kind: 'docker', image: reference.slice(0, at), digest: reference.slice(at + 1) };
   }
   const at = uses.lastIndexOf('@');
   const target = at === -1 ? uses : uses.slice(0, at);
