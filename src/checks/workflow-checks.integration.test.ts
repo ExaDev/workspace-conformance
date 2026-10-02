@@ -161,6 +161,49 @@ jobs:
     expect(where(await workflowJobOrdering({ cwd, options: {} }))).toEqual([`workflow-job-ordering/junction-missing-need ${CI}:4`]);
   });
 
+  it('still requires the junction job to wait for a job that runs in the merge queue, or whose if is a disjunction that can hold for a pull request', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      [CI]: `
+on: [pull_request, merge_group]
+jobs:
+  required-checks:
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "\${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" != true
+  e2e:
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+  audit:
+    if: github.ref == 'refs/heads/main' || github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+`,
+    });
+
+    expect(where(await workflowJobOrdering({ cwd, options: {} }))).toEqual([`workflow-job-ordering/junction-missing-need ${CI}:4`, `workflow-job-ordering/junction-missing-need ${CI}:4`]);
+  });
+
+  it('does not require the junction job to wait for a job that needs it', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      [CI]: `
+on: [push, pull_request]
+jobs:
+  required-checks:
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "\${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" != true
+  publish:
+    needs: [required-checks]
+    runs-on: ubuntu-latest
+`,
+    });
+
+    expect(await workflowJobOrdering({ cwd, options: {} })).toEqual([]);
+  });
+
   it('does not judge a role that has no job in the workflow', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, { [CI]: 'on: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n' });
