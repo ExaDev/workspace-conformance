@@ -218,11 +218,12 @@ jobs:
           git push --dry-run --force --no-verify -- "git@github.com:${GITHUB_REPOSITORY}.git" HEAD:main
           HUSKY=0 pnpm exec semantic-release
         env:
-          GIT_SSH_COMMAND: ssh -i ${{ runner.temp }}/release-deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${{ runner.temp }}/release-known-hosts
+          GIT_SSH_COMMAND: /usr/bin/ssh -F /dev/null -i ${{ runner.temp }}/release-deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${{ runner.temp }}/release-known-hosts
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Blanked, not omitted: an inherited NPM_TOKEN or NODE_AUTH_TOKEN would otherwise be used in preference to the OIDC exchange.
           NPM_TOKEN: ''
           NODE_AUTH_TOKEN: ''
+          # The absolute ssh path and -F /dev/null keep a directory an earlier step prepended to PATH, and an ssh config it wrote (Match exec, ProxyCommand, extra IdentityFile), from influencing the release connection.
           # npm publish must not run package.json lifecycle scripts (prepublishOnly) while the deploy key is reachable; the build was done before the key was provisioned.
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
           # Fails closed: semantic-release's own SSH check is a separate connection from the preflight, and when it fails it silently switches to an https URL carrying GITHUB_TOKEN, whose dry-run succeeds because dry-runs do not evaluate rulesets, so npm would publish before the final push is rejected. With only ssh allowed git refuses that URL before anything is published.
