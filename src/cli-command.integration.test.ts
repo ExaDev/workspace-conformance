@@ -120,6 +120,15 @@ describe('check --settings', () => {
     expect(result.stderr).toBe('--settings needs a token in GITHUB_TOKEN or GH_TOKEN\n');
   });
 
+  it('falls back to GH_TOKEN when GITHUB_TOKEN is empty', async () => {
+    vi.stubEnv('GITHUB_TOKEN', '');
+    vi.stubEnv('GH_TOKEN', 'test-token');
+    const result = await run('check', '--settings', '--cwd', fixturePath('imports', 'clean'));
+
+    expect(result.stderr).not.toContain('--settings needs a token');
+    expect(result.code).toBe(EXIT_CODES.clean);
+  });
+
   it('is described in the usage', async () => {
     expect((await run('check', '--help')).stdout).toContain('--settings');
   });
