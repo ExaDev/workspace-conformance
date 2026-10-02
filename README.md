@@ -10,7 +10,7 @@ It complements the workspace architecture rules of [`@exadev/eslint-config`](htt
 pnpm add -D workspace-conformance @exadev/config cosmiconfig 'typescript@^6'
 ```
 
-`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`^5.9.0 || ^6.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7 (the range is in the install command because an unpinned `typescript` installs a newer major, which pnpm only warns about); the import checks fail with a configuration error when dependency-cruiser cannot load it. ts-morph bundles its own compiler and does not use yours. The package supports the Node lines dependency-cruiser and its own dependencies support: 22.13 and later 22, 24, and 26 and later.
+`cosmiconfig` (`^9.0.0 || ^10.0.0`) is a peer dependency because `@exadev/config` loads config files through it. `typescript` (`^5.9.0 || ^6.0.0`) is a peer dependency because dependency-cruiser needs it to parse TypeScript and supports versions below 7 (the range is in the install command because an unpinned `typescript` installs a newer major, which pnpm only warns about); the import checks fail with a configuration error when dependency-cruiser cannot load it. ts-morph bundles its own compiler and does not use yours. `eslint` (`^9.0.0 || ^10.0.0`) is an optional peer dependency, needed only by the `eslint` check, which uses the copy installed in the repository it checks. The package supports the Node lines dependency-cruiser and its own dependencies support: 22.13 and later 22, 24, and 26 and later.
 
 Configure the checks in `exadev.config.ts`:
 
@@ -161,6 +161,33 @@ False positives and blind spots:
 - Config variants: only the directory searched is looked at, whereas wrangler also finds a config in a parent directory and follows a redirected config; a repository with both `wrangler.json` and `wrangler.toml` is judged by the first, and a `migrations_pattern` that narrows which files are applied is not read. A generator config that computes `out` from the environment is judged by its value in the process running the check.
 - Scripts: a script is matched by the text of the command, so `drizzle-kit migrate` run against a local database for tests is reported, and a command assembled in a shell variable or run from a file the script calls is not seen. Narrow `packageJsons` to exempt a package.
 
+### ESLint
+
+**`eslint`** proves that the repository's own ESLint is applied. Every other lint rule runs inside ESLint, so none of them can notice a config that dropped a shared preset, switched its rules off or narrowed `ignores` until nothing is linted; the repository then looks configured and enforces nothing. This check asks ESLint itself, through its Node API, and carries no ESLint config of its own: a flat config holds plugin objects, a parser and functions, and editors and CI expect `eslint.config.*` where it already is.
+
+ESLint (`^9.0.0 || ^10.0.0`) is an optional peer dependency, needed only by this check. It is resolved from the directory the checks run in, the way a module there would find it, and not from this package, so the answer is the one the repository's own lint script gets. When `eslint` does not resolve from there the run fails with a configuration error. When ESLint finds no config file for a sample the check reports `eslint/no-config` and does not substitute one.
+
+| Option | Meaning |
+|---|---|
+| `samples` | Required. One file per kind of source the repository lints (`src/index.ts`, `package.json`, `eslint.config.ts`), as a path or `{ path, rules }`. A path need not exist: ESLint resolves a file's configuration from its path alone. |
+| `rules` | Rules required for every sample, each with the severity it must have at least: `warn` is met by `warn` or `error`, `error` only by `error`. Rule entries in the form `[severity, ...options]` and numeric severities are read as their severity. A sample's own `rules` are added to these and win. |
+| `configFile` | A config file to judge instead of the one ESLint finds from the working directory. |
+| `lint` | Also lint the workspace and report every message it produces. Off when omitted. |
+| `lintPatterns` | What `lint` lints, as file and directory patterns. `.` when omitted. |
+
+The default level lints nothing. For each sample it calls `calculateConfigForFile`, the same call the CLI's `--print-config` makes, which applies `files` and `ignores`. A file that is ignored, or that no configuration block matches, resolves to no configuration (`isPathIgnored` is that call returning nothing), and that is `eslint/not-linted`. Otherwise each required rule must be configured at the required severity: `eslint/rule-missing`, `eslint/rule-off` or `eslint/rule-too-weak`, each naming the rule and the file.
+
+With `lint` the check also lints the workspace through `lintFiles` and maps every message to a violation at its position. The code names the rule, `eslint/lint/<rule id>`, so `eslint/lint/no-console` and `eslint/lint/@scope/plugin/rule` are stable; a parsing error is `eslint/fatal` and a message with no rule, such as an unused disable directive, is `eslint/lint-message`. A pattern that matches no file, or only ignored files, is `eslint/nothing-linted`. Warnings are reported as well as errors, since a repository that fails its lint script on warnings (`--max-warnings 0`) is judged by what that script reports.
+
+Limits:
+
+- An external config is a black box. The check sees which rules are active on a file, not why, so it cannot tell a rule enabled by a shared preset from one written locally. Require the rules that matter and let the repository decide how it gets them.
+- It reads the config ESLint resolves for each sample, and a sample stands for the files like it. A rule can be off for one directory the samples do not cover, so choose a sample for each kind of source and each directory with its own override.
+- An ignored file and a file that no configuration block matches both resolve to nothing and are reported the same way.
+- Only rule severities are compared, not rule options.
+- Flat config only: the ESLint 9 and later `ESLint` class. Legacy `.eslintrc` configuration is not read.
+- A config that is a TypeScript file needs whatever ESLint itself needs to load it (`jiti`), installed where ESLint is.
+
 ### Workflows
 
 The `workflow-*` checks read GitHub Actions workflow files and run offline. Each file under `.github/workflows` is parsed into a model of its events, jobs, the transitive `needs` graph, `if` conditions, effective permissions (a job's own declaration replaces the workflow's, it is not merged with it) and effective environment (workflow, then job, then step), and the checks read that model. A file that is not YAML, or is not shaped like a workflow, fails the run with a configuration error instead of being skipped. Expressions (`${{ ... }}`) are never evaluated: a value that is an expression is treated as unknown, and a check that needs a literal ignores it.
@@ -256,7 +283,7 @@ it('conforms to the workspace layout', async () => {
 });
 ```
 
-Every check is also exported as a function taking `{ cwd, options }` (and `layout` for the import checks): `aggregateMappers`, `commandTypes`, `importUphill`, `importRankSkip`, `importCrossSlice`, `importIsolatedGroups`, `importCycles`, `instructionSymlinks`, `singleStorybook`, `commitTypes`, `dockerfilePackageManager`, `migrationsDirectory`, the workflow checks (`workflowJobOrdering`, `workflowSkippableJobs`, `workflowRunnerResolution`, `workflowVersionSingleSource`, `workflowCredentials`, `workflowRepositoryDispatch`, `workflowUpdateBotCooldown`, `workflowMergeGroup` and `workflowActionPinning`) and, taking `{ cwd, options, github }`, the settings checks (`settingsMergeMethods`, `settingsRequiredChecks` and `settingsReviewThreadResolution`). These take options and a layout as already validated and do not check them again; go through `runChecks` for validation. `parseWorkflow` and `loadWorkflows` expose the workflow model the workflow checks read. A check is a function that returns `Promise<readonly Violation[]>`, where a `Violation` is `{ code, message, file, location? }`.
+Every check is also exported as a function taking `{ cwd, options }` (and `layout` for the import checks): `aggregateMappers`, `commandTypes`, `importUphill`, `importRankSkip`, `importCrossSlice`, `importIsolatedGroups`, `importCycles`, `instructionSymlinks`, `singleStorybook`, `commitTypes`, `dockerfilePackageManager`, `migrationsDirectory`, `eslint`, the workflow checks (`workflowJobOrdering`, `workflowSkippableJobs`, `workflowRunnerResolution`, `workflowVersionSingleSource`, `workflowCredentials`, `workflowRepositoryDispatch`, `workflowUpdateBotCooldown`, `workflowMergeGroup` and `workflowActionPinning`) and, taking `{ cwd, options, github }`, the settings checks (`settingsMergeMethods`, `settingsRequiredChecks` and `settingsReviewThreadResolution`). These take options and a layout as already validated and do not check them again; go through `runChecks` for validation. `parseWorkflow` and `loadWorkflows` expose the workflow model the workflow checks read. A check is a function that returns `Promise<readonly Violation[]>`, where a `Violation` is `{ code, message, file, location? }`.
 
 ### Proving a handler map is exhaustive
 
