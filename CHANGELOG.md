@@ -1,3 +1,29 @@
+# [1.2.0](https://github.com/ExaDev/workspace-conformance/compare/v1.1.0...v1.2.0) (2026-10-02)
+
+
+### Bug Fixes
+
+* **cli:** fall back to GH_TOKEN when GITHUB_TOKEN is empty and fail with a ConformanceError ([dc4aba5](https://github.com/ExaDev/workspace-conformance/commit/dc4aba5cb3407892345abeab82f2ad23d29c67ef))
+* **github:** reject with a ConformanceError when the token cannot see the merge-method settings ([856d427](https://github.com/ExaDev/workspace-conformance/commit/856d427b1ecdd07c0a79e60db684152bbd069889))
+* read git push destinations through HEAD, forcing plus and valued options ([9bf8c11](https://github.com/ExaDev/workspace-conformance/commit/9bf8c1111c321eb786f4be24afe271d76a821ab1))
+* recognise a publish with package manager options before the subcommand ([f6a5b8c](https://github.com/ExaDev/workspace-conformance/commit/f6a5b8cd238efeab789d514bae4a45acc4645a01))
+* recognise junction jobs that loop over joined results and exempt jobs that skip pull requests ([a5d5362](https://github.com/ExaDev/workspace-conformance/commit/a5d53627317660099c3d8c9d40ef96b68a3c53d9))
+* require a resolver's literal fallback to name only hosted runner labels ([40aaf2c](https://github.com/ExaDev/workspace-conformance/commit/40aaf2c295946dae7451c2dcc761ee2218a71ae4))
+* **workflow-credentials:** recognise changeset and semantic-release run through a package manager ([3cbff68](https://github.com/ExaDev/workspace-conformance/commit/3cbff68b395c2533df4789a4d2cb6debb869f84c))
+* **workflow-credentials:** state that provenance makes a fallback publish traceable only ([0b95fec](https://github.com/ExaDev/workspace-conformance/commit/0b95fec3c62bacaf557bdb199efc89b8cb218fc5))
+* **workflow-job-ordering:** judge an if by its && and || structure ([8eef3d1](https://github.com/ExaDev/workspace-conformance/commit/8eef3d1eea3ceee6d9410245c8a6fcdc584c5938))
+* **workflow-job-ordering:** report a skipped-result test on a single job's needs result ([0d54eb8](https://github.com/ExaDev/workspace-conformance/commit/0d54eb8f0eab9bd2483f286618d1dedf368a3f68))
+* **workflow-job-ordering:** require the junction job to wait for merge-queue and disjunctive jobs ([3cfa322](https://github.com/ExaDev/workspace-conformance/commit/3cfa3223998e5f720036569a7b643af75962ad1b))
+* **workflow-repository-dispatch:** read a default-branch push through quotes and git global options ([f68d02a](https://github.com/ExaDev/workspace-conformance/commit/f68d02a4251e77c578f8f85a6af952159b1cf863))
+* **workflow-update-bot-cooldown:** require Renovate's minimumReleaseAge to wait for a positive time ([be7e33c](https://github.com/ExaDev/workspace-conformance/commit/be7e33c4a7a8ce98e727e71ba9c60d65815a7ed6))
+* **workflows:** split commands outside expressions and redirections ([e70be7a](https://github.com/ExaDev/workspace-conformance/commit/e70be7a3b4a40f9478a24c3057acfc5bae9892b2))
+
+
+### Features
+
+* add workflow checks and settings checks behind an injectable GitHub client ([7d5de53](https://github.com/ExaDev/workspace-conformance/commit/7d5de53d7ce2e386164a8a07f5db1782d2e7ed56))
+* parse workflow files into a model of jobs, needs, permissions and environment ([f56a11c](https://github.com/ExaDev/workspace-conformance/commit/f56a11c5f2f834dd2f4b96eb6b35abc29d672e08))
+
 # [1.1.0](https://github.com/ExaDev/workspace-conformance/compare/v1.0.0...v1.1.0) (2026-10-01)
 
 
