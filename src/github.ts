@@ -44,9 +44,9 @@ export interface GitHubClient {
 
 const repositorySchema = z.object({
   default_branch: z.string(),
-  allow_rebase_merge: z.boolean(),
-  allow_squash_merge: z.boolean(),
-  allow_merge_commit: z.boolean(),
+  allow_rebase_merge: z.optional(z.boolean()),
+  allow_squash_merge: z.optional(z.boolean()),
+  allow_merge_commit: z.optional(z.boolean()),
 });
 
 const rulesSchema = z.array(
@@ -68,7 +68,7 @@ const rulesSchema = z.array(
  */
 export interface GitHubClientOptions {
   /**
-   * A token that can read the repository's settings and rulesets.
+   * A token that can read the repository's settings and rulesets. The API reports the merge-method settings only to a token with write access to the repository, so a token without it makes {@link GitHubClient.repository} reject.
    */
   readonly token: string;
   /**
@@ -108,8 +108,12 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
   return {
     repository: async (slug) => {
       const parsed = repositorySchema.parse(await get(`/repos/${slug.owner}/${slug.name}`));
+      const { allow_rebase_merge: allowRebaseMerge, allow_squash_merge: allowSquashMerge, allow_merge_commit: allowMergeCommit } = parsed;
+      if (allowRebaseMerge === undefined || allowSquashMerge === undefined || allowMergeCommit === undefined) {
+        throw new ConformanceError(`GET /repos/${slug.owner}/${slug.name} did not report the merge-method settings, which GitHub shows only to a token with write access to the repository`);
+      }
 
-      return { defaultBranch: parsed.default_branch, allowRebaseMerge: parsed.allow_rebase_merge, allowSquashMerge: parsed.allow_squash_merge, allowMergeCommit: parsed.allow_merge_commit };
+      return { defaultBranch: parsed.default_branch, allowRebaseMerge, allowSquashMerge, allowMergeCommit };
     },
     branchRules: async (slug, branch) => {
       const rules: z.output<typeof rulesSchema> = [];
