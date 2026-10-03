@@ -1,0 +1,14 @@
+# Dependabot for the GitHub Actions this repository's workflows use. Every third-party action is pinned by full commit SHA with its release in a trailing comment, so a tag moved by someone outside ExaDev cannot change the code a job runs; Dependabot keeps those pins current by proposing the new SHA and comment together.
+#
+# Every entry waits a week after a release before proposing it (cooldown), so a compromised or broken publish has time to be noticed and pulled before it reaches a pull request here. Security updates are not delayed by it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
