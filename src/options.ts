@@ -331,7 +331,7 @@ export interface WorkflowSkippableJobsOptions extends WorkflowSelection {
  */
 export interface WorkflowRunnerResolutionOptions extends WorkflowSelection {
   /**
-   * Regular expressions, as source text, for the labels GitHub hosts itself and that may be repeated freely. `ubuntu`, `windows` and `macos` images, `-latest`, versioned, `-arm`, `-intel`, `-xlarge`, `-large` and `-slim` forms, when omitted. Setting it replaces that default.
+   * Regular expressions, as source text, for the labels of hosted runners, which may be repeated freely and are what a resolver's fallback must name. GitHub's own `ubuntu`, `windows` and `macos` images, `-latest`, versioned, `-arm`, `-intel`, `-xlarge`, `-large` and `-slim` forms, when omitted (`DEFAULT_HOSTED_LABELS`). Setting it replaces that default, so spread `DEFAULT_HOSTED_LABELS` into the list to add a third-party hosted runner's labels to GitHub's.
    */
   readonly hostedLabels?: readonly string[];
 }
