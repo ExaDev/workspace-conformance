@@ -1,3 +1,23 @@
+# [4.0.0](https://github.com/ExaDev/workspace-conformance/compare/v3.0.0...v4.0.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **check:** model a settings violation as about the repository, not a file ([750277b](https://github.com/ExaDev/workspace-conformance/commit/750277b11a5f143ea60486d7dcc7d387bdf59ef8))
+* **workflow-merge-group:** treat a plan without rulesets as no merge queue ([2c58bed](https://github.com/ExaDev/workspace-conformance/commit/2c58bed870f09fd73c945782870a97e833f03bfb))
+
+
+### BREAKING CHANGES
+
+* **check:** a violation from settings-merge-methods,
+settings-required-checks or settings-review-thread-resolution now has
+`repository` (owner/name) in place of `file`, in the library and in the
+json output, and Violation is FileViolation | RepositoryViolation, so
+code that reads `violation.file` must handle it being undefined.
+GitHubCheckFunction returns RepositoryViolation, the other check
+function types return FileViolation, and githubAnnotation takes only
+the violation.
+
 # [3.0.0](https://github.com/ExaDev/workspace-conformance/compare/v2.0.2...v3.0.0) (2026-10-03)
 
 
