@@ -105,23 +105,78 @@ describe('engines-floor', () => {
     );
   });
 
-  it('judges peer dependencies as installed, and skips an optional peer or optional dependency that is not installed', async () => {
+  it('judges an optional dependency as installed, and skips one that is not installed', async () => {
     const cwd = await workspace({
-      'package.json': manifest({
-        name: 'root',
-        engines: { node: '>=20' },
-        peerDependencies: { host: '^1.0.0', extra: '^1.0.0' },
-        peerDependenciesMeta: { extra: { optional: true } },
-        optionalDependencies: { native: '^1.0.0', accelerated: '^1.0.0' },
-      }),
-      'node_modules/host/package.json': manifest({ name: 'host', engines: { node: '>=22' } }),
+      'package.json': manifest({ name: 'root', engines: { node: '>=20' }, optionalDependencies: { native: '^1.0.0', accelerated: '^1.0.0' } }),
       'node_modules/accelerated/package.json': manifest({ name: 'accelerated', engines: { node: '>=24' } }),
     });
 
     expect((await enginesFloor({ cwd, options: {} })).map((violation) => violation.message)).toEqual([
       "engines.node '>=20' admits Node versions that the optional dependency 'accelerated' rejects with engines.node '>=24'; narrow it to a subset of that range",
-      "engines.node '>=20' admits Node versions that the peer dependency 'host' rejects with engines.node '>=22'; narrow it to a subset of that range",
     ]);
+  });
+
+  it('does not judge a peer range admitting two majors by the one installed, whose engines another major it admits may not share', async () => {
+    const cwd = await workspace({
+      'package.json': manifest({ name: 'root', engines: { node: '^22.13.0 || ^24.0.0 || >=26.0.0' }, peerDependencies: { loader: '^9.0.0 || ^10.0.0' } }),
+      'node_modules/loader/package.json': manifest({ name: 'loader', version: '10.0.1', engines: { node: '^22.18 || >= 24' } }),
+    });
+
+    expect(await enginesFloor({ cwd, options: {} })).toEqual([]);
+  });
+
+  it('does not judge a peer range within one major either, since an earlier version it admits may accept more Node versions', async () => {
+    const cwd = await workspace({
+      'package.json': manifest({ name: 'root', engines: { node: '>=20' }, peerDependencies: { host: '^1.0.0' } }),
+      'node_modules/host/package.json': manifest({ name: 'host', version: '1.4.0', engines: { node: '>=22' } }),
+    });
+
+    expect(await enginesFloor({ cwd, options: {} })).toEqual([]);
+  });
+
+  it('does not judge a peer range of a single comparator that is not an exact version, nor a spec that is not a semver range', async () => {
+    const cwd = await workspace({
+      'package.json': manifest({ name: 'root', engines: { node: '>=20' }, peerDependencies: { floor: '>=1.0.0', every: '*', sibling: 'workspace:^' } }),
+      'node_modules/floor/package.json': manifest({ name: 'floor', version: '1.0.0', engines: { node: '>=22' } }),
+      'node_modules/every/package.json': manifest({ name: 'every', version: '1.0.0', engines: { node: '>=22' } }),
+      'node_modules/sibling/package.json': manifest({ name: 'sibling', version: '1.0.0', engines: { node: '>=22' } }),
+    });
+
+    expect(await enginesFloor({ cwd, options: {} })).toEqual([]);
+  });
+
+  it('does not require a peer whose range admits several versions to be installed, since its copy would not be read', async () => {
+    const cwd = await workspace({ 'package.json': manifest({ name: 'root', engines: { node: '>=20' }, peerDependencies: { host: '^1.0.0' } }) });
+
+    expect(await enginesFloor({ cwd, options: {} })).toEqual([]);
+  });
+
+  it('judges a peer whose range admits a single version by its installed copy, and skips an optional one that is not installed', async () => {
+    const cwd = await workspace({
+      'package.json': manifest({
+        name: 'root',
+        engines: { node: '>=20' },
+        peerDependencies: { host: '1.2.3', pinned: '=2.0.0', extra: '1.0.0' },
+        peerDependenciesMeta: { extra: { optional: true } },
+      }),
+      'node_modules/host/package.json': manifest({ name: 'host', version: '1.2.3', engines: { node: '>=22' } }),
+      'node_modules/pinned/package.json': manifest({ name: 'pinned', version: '2.0.0', engines: { node: '>=24' } }),
+    });
+
+    expect((await enginesFloor({ cwd, options: {} })).map((violation) => violation.message)).toEqual([
+      "engines.node '>=20' admits Node versions that the peer dependency 'host' rejects with engines.node '>=22'; narrow it to a subset of that range",
+      "engines.node '>=20' admits Node versions that the peer dependency 'pinned' rejects with engines.node '>=24'; narrow it to a subset of that range",
+    ]);
+  });
+
+  it('fails the run when a peer whose range admits a single version is not installed or is installed as another version', async () => {
+    const run = async (files: Readonly<Record<string, string>>): Promise<unknown> => enginesFloor({ cwd: await workspace(files), options: {} });
+    const root = manifest({ name: 'root', engines: { node: '>=20' }, peerDependencies: { host: '1.2.3' } });
+
+    await expect(run({ 'package.json': root })).rejects.toThrow("package.json: the peer dependency 'host' is not installed");
+    await expect(run({ 'package.json': root, 'node_modules/host/package.json': manifest({ name: 'host', version: '1.3.0', engines: { node: '>=22' } }) })).rejects.toThrow(
+      "package.json: the peer dependency 'host' admits only version 1.2.3, but node_modules/host/package.json is version 1.3.0; install the workspace before running engines-floor",
+    );
   });
 
   it('judges the root package and each package pnpm-workspace.yaml lists, resolving a dependency from the nearest node_modules as Node does', async () => {
@@ -175,6 +230,7 @@ describe('engines-floor', () => {
     await expect(run({ engines: ['node >= 20'] })).rejects.toThrow('package.json: engines must be an object');
     await expect(run({ engines: { node: 20 } })).rejects.toThrow('package.json: engines.node must be a string, not 20');
     await expect(run({ dependencies: ['lib'] })).rejects.toThrow('package.json: dependencies must be an object');
+    await expect(run({ peerDependencies: { host: 1 } })).rejects.toThrow('package.json: peerDependencies.host must be a string, not 1');
   });
 
   it('fails the run when the options select no package, so nothing is never a pass', async () => {
