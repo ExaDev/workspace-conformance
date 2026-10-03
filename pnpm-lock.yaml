@@ -168,10 +168,10 @@ importers:
     dependencies:
       '@exadev/config':
         specifier: ^2.1.0
-        version: 2.1.0(cosmiconfig@10.0.1)
+        version: 2.1.2(cosmiconfig@10.0.1)
       cosmiconfig-extends:
         specifier: ^1.0.1
-        version: 1.0.1(cosmiconfig@10.0.1)
+        version: 1.1.5(cosmiconfig@10.0.1)
       dependency-cruiser:
         specifier: ^18.4.0
         version: 18.4.0
@@ -658,8 +658,8 @@ packages:
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@exadev/config@2.1.0':
-    resolution: {integrity: sha512-WnV6E+6oGUnA8t8mMQWKHkrg40XQGpaBzFzshgjj5KgVkwly2io5jgBbc6xYm5NE8CluAMhglYimWMJ2GCw0wg==}
+  '@exadev/config@2.1.2':
+    resolution: {integrity: sha512-WoKdCvbqdiNTYFqVrZtINTdtTIah4Y1KuEr//hl9KL6YRO6CD9cZsokohRbzp73v9kidHwt5dxcJgn1v7885CA==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
@@ -1771,8 +1771,8 @@ packages:
   core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==}
 
-  cosmiconfig-extends@1.0.1:
-    resolution: {integrity: sha512-g8jWbkkzGTDyCwjaRypVhmmp18pcXzESAHhWPzJbK+yshmw/63dAtxsyVPBgRacGlb1jfH4QIw+4EjbnhKpadw==}
+  cosmiconfig-extends@1.1.5:
+    resolution: {integrity: sha512-rywlK26PkOizGrTReJ0t7smxMRLMZVLy0rhu8hquidF34AsstWGw9oofocwoJEgtDC+0TGdT+fUug2t+im+wQw==}
     engines: {node: '>=20'}
     peerDependencies:
       cosmiconfig: ^9.0.0 || ^10.0.0
@@ -4168,11 +4168,11 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@exadev/config@2.1.0(cosmiconfig@10.0.1)':
+  '@exadev/config@2.1.2(cosmiconfig@10.0.1)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       cosmiconfig: 10.0.1
-      cosmiconfig-extends: 1.0.1(cosmiconfig@10.0.1)
+      cosmiconfig-extends: 1.1.5(cosmiconfig@10.0.1)
 
   '@exadev/eslint-config@2.23.0(@eslint/json@2.1.0)(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript-eslint@8.71.0(eslint@10.11.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3))(typescript@6.0.3)':
     dependencies:
@@ -5305,7 +5305,7 @@ snapshots:
 
   core-util-is@1.0.3: {}
 
-  cosmiconfig-extends@1.0.1(cosmiconfig@10.0.1):
+  cosmiconfig-extends@1.1.5(cosmiconfig@10.0.1):
     dependencies:
       '@standard-schema/spec': 1.1.0
       cosmiconfig: 10.0.1
