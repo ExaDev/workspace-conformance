@@ -107,6 +107,10 @@ export interface Workflow {
    * The `value` of each output a reusable workflow declares under `on.workflow_call.outputs`.
    */
   readonly callOutputs: Readonly<Record<string, string>>;
+  /**
+   * The `default` of each input a reusable workflow declares under `on.workflow_call.inputs`, as text; `undefined` for an input without one.
+   */
+  readonly callInputs: Readonly<Record<string, string | undefined>>;
 }
 
 /**
@@ -323,6 +327,7 @@ export function parseWorkflow(file: string, source: string): Workflow {
   const triggers = triggersOf(reader, root['on']);
   const call = triggers.get('workflow_call');
   const outputs = reader.record(reader.record(call, 'on.workflow_call')['outputs'], 'on.workflow_call.outputs');
+  const inputs = reader.record(reader.record(call, 'on.workflow_call')['inputs'], 'on.workflow_call.inputs');
 
   return {
     file,
@@ -334,6 +339,7 @@ export function parseWorkflow(file: string, source: string): Workflow {
     env: reader.texts(root['env'], 'env'),
     jobs: Object.entries(reader.record(root['jobs'], 'jobs')).map(([id, job]) => jobOf(reader, id, job)),
     callOutputs: Object.fromEntries(Object.entries(outputs).map(([name, output]) => [name, reader.text(reader.record(output, `on.workflow_call.outputs.${name}`)['value'], `on.workflow_call.outputs.${name}.value`) ?? ''])),
+    callInputs: Object.fromEntries(Object.entries(inputs).map(([name, input]) => [name, reader.text(reader.record(input, `on.workflow_call.inputs.${name}`)['default'], `on.workflow_call.inputs.${name}.default`)])),
   };
 }
 

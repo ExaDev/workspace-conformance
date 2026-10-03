@@ -2,7 +2,8 @@ import type { CheckFunction, Violation } from '../check';
 import { ConformanceError } from '../errors';
 import type { WorkflowRunnerResolutionOptions } from '../options';
 import { DEFAULT_WORKFLOWS, loadWorkflows } from '../workflows/load';
-import { type Job, parseUses, type Workflow } from '../workflows/model';
+import { constantString, operands, unwrapped } from '../workflows/expressions';
+import { hasExpression, type Job, parseUses, type Workflow } from '../workflows/model';
 import { workflowViolation } from '../workflows/shared';
 
 /**
@@ -20,15 +21,14 @@ const RESOLVED_RUNNER = /fromJSON\(\s*needs\.([\w-]+)\.outputs\.([\w-]+)\s*\)/gi
  */
 const JOB_OUTPUT_REFERENCE = /^\$\{\{\s*jobs\.([\w-]+)\.outputs\.([\w-]+)\s*\}\}$/u;
 
-/**
- * A fallback in an output expression: `||` followed by a string literal, whose body may hold `''` for a quote.
- */
-const LITERAL_FALLBACK = /\|\|\s*'((?:[^']|'')*)'/gu;
-
 interface Resolver {
   readonly workflow: Workflow;
   readonly job: Job;
   readonly output: string;
+  /**
+   * The value each input of the resolver's workflow has in this call, when it is the same on every run: the literal the caller passes, else the input's default. Empty for a resolver that is not a reusable workflow.
+   */
+  readonly inputs: Readonly<Record<string, string | undefined>>;
 }
 
 /**
@@ -53,7 +53,7 @@ function resolversOf(workflow: Workflow, workflows: readonly Workflow[]): readon
  */
 function implementation(workflow: Workflow, workflows: readonly Workflow[], caller: Job, output: string): Resolver | undefined {
   if (caller.uses === undefined) {
-    return { workflow, job: caller, output };
+    return { workflow, job: caller, output, inputs: {} };
   }
   const reference = parseUses(caller.uses);
   if (reference.kind !== 'local') {
@@ -67,14 +67,25 @@ function implementation(workflow: Workflow, workflows: readonly Workflow[], call
   const job = called.jobs.find((candidate) => candidate.id === forwarded?.[1]);
   const jobOutput = forwarded?.[2];
 
-  return job === undefined || jobOutput === undefined ? undefined : { workflow: called, job, output: jobOutput };
+  const inputs = Object.fromEntries(
+    Object.entries(called.callInputs).map(([name, fallback]) => {
+      const passed = caller.with[name];
+
+      return [name, passed === undefined ? fallback : hasExpression(passed) ? undefined : passed];
+    }),
+  );
+
+  return job === undefined || jobOutput === undefined ? undefined : { workflow: called, job, output: jobOutput, inputs };
 }
 
 /**
- * The runner labels the last literal fallback of an output expression names, read as the JSON the `fromJson` that consumes it expects: a label or a list of labels. `undefined` when there is no literal fallback, and an empty list when the literal is not labels.
+ * The runner labels the fallback of an output expression names, read as the JSON the `fromJson` that consumes it expects: a label or a list of labels. The fallback is the first operand after the first of the expression's top-level `||` chain whose value is the same on every run and not empty (see `constantString`), which is what the chain yields when the operands before it are empty. `undefined` when there is no such operand, and an empty list when its value is not labels.
  */
-function fallbackLabels(expression: string): readonly string[] | undefined {
-  const literal = [...expression.matchAll(LITERAL_FALLBACK)].at(-1)?.[1]?.replaceAll("''", "'");
+function fallbackLabels(expression: string, inputs: Readonly<Record<string, string | undefined>>): readonly string[] | undefined {
+  const literal = operands(unwrapped(expression), '||')
+    .slice(1)
+    .map((operand) => constantString(operand, inputs))
+    .find((value) => value !== undefined && value !== '');
   if (literal === undefined) {
     return undefined;
   }
@@ -97,10 +108,10 @@ function resolverViolations(resolver: Resolver, hosted: readonly RegExp[]): read
       workflowViolation(resolver.workflow, 'workflow-runner-resolution/resolver-no-timeout', `resolver job '${resolver.job.id}' has no timeout-minutes, so a runner that never starts holds every job waiting for it until the default six hours`, resolver.job.location),
     );
   }
-  const fallback = fallbackLabels(resolver.job.outputs[resolver.output] ?? '');
+  const fallback = fallbackLabels(resolver.job.outputs[resolver.output] ?? '', resolver.inputs);
   if (fallback === undefined) {
     violations.push(
-      workflowViolation(resolver.workflow, 'workflow-runner-resolution/resolver-no-fallback', `output '${resolver.output}' of resolver job '${resolver.job.id}' has no literal fallback (\`|| '["<hosted label>"]'\`), so the jobs that read it have no runner when resolution produces nothing`, resolver.job.location),
+      workflowViolation(resolver.workflow, 'workflow-runner-resolution/resolver-no-fallback', `output '${resolver.output}' of resolver job '${resolver.job.id}' has no fallback whose value is known before the run (\`|| '["<hosted label>"]'\`, or format() of literals and of inputs with a literal value), so the jobs that read it have no runner when resolution produces nothing`, resolver.job.location),
     );
   } else if (fallback.length === 0) {
     violations.push(
@@ -155,7 +166,7 @@ function repeatedLabels(workflow: Workflow, hosted: readonly RegExp[]): readonly
 /**
  * A self-hosted or custom runner label named literally in more than one job of a workflow is resolved once instead: a resolver job decides the runner and the others read it with `fromJson(needs.<resolver>.outputs.<name>)`. The resolver must have a `timeout-minutes` and its output a literal fallback that names only hosted runner labels, so jobs still get a runner when resolution fails or the self-hosted fleet is down.
  *
- * A label is custom when it matches none of `hostedLabels`; the default patterns recognise GitHub's standard images, so a larger runner is named by a custom label and counts. Labels are compared within a workflow file, not across files. A resolver that is a reusable workflow is followed when it is a file of this repository (the output is traced through `on.workflow_call.outputs` to the job that sets it); a resolver in another repository cannot be read and is not judged. An output is taken to have a fallback when its expression has `||` followed by a string literal, and the last such literal is read as JSON (a label or a list of labels) and matched against `hostedLabels`; a fallback that is not valid JSON, or names any other label, is reported.
+ * A label is custom when it matches none of `hostedLabels`; the default patterns recognise GitHub's standard images, so a larger runner is named by a custom label and counts. Labels are compared within a workflow file, not across files. A resolver that is a reusable workflow is followed when it is a file of this repository (the output is traced through `on.workflow_call.outputs` to the job that sets it); a resolver in another repository cannot be read and is not judged. An output's fallback is the first operand after the first of its expression's top-level `||` chain whose value is the same on every run: a string literal, or `format()` of literals and of inputs of the reusable workflow, read from the literal the caller passes or else the input's default. It is read as JSON (a label or a list of labels) and matched against `hostedLabels`; a fallback that is not valid JSON, or names any other label, is reported, and an output with no such operand has no fallback.
  */
 export const workflowRunnerResolution: CheckFunction<WorkflowRunnerResolutionOptions> = async ({ cwd, options }) => {
   const hosted = (options.hostedLabels ?? DEFAULT_HOSTED_LABELS).map((source) => new RegExp(source, 'u'));
@@ -164,7 +175,7 @@ export const workflowRunnerResolution: CheckFunction<WorkflowRunnerResolutionOpt
   const resolvers = new Map<string, Resolver>();
   for (const workflow of selected) {
     for (const resolver of resolversOf(workflow, available)) {
-      resolvers.set(`${resolver.workflow.file}#${resolver.job.id}#${resolver.output}`, resolver);
+      resolvers.set(`${resolver.workflow.file}#${resolver.job.id}#${resolver.output}#${JSON.stringify(resolver.inputs)}`, resolver);
     }
   }
 
