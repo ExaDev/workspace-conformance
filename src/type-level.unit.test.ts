@@ -28,6 +28,8 @@ export const handlers: Handlers = ${CASES};
 
 const MISSING_PROPERTY = 2741;
 const IMPLICIT_ANY_PARAMETER = 7006;
+const CANNOT_FIND_MODULE = 2307;
+const CANNOT_FIND_NAME = 2304;
 const CASE_COUNT = 3;
 
 describe('proveExhaustive', () => {
@@ -117,6 +119,17 @@ describe('typeErrors', () => {
 
     expect(typeErrors({ 'a.ts': source }).map((error) => error.code)).toEqual([IMPLICIT_ANY_PARAMETER]);
     expect(typeErrors({ 'a.ts': source }, { noImplicitAny: false })).toEqual([]);
+  });
+
+  it('type-checks declaration files among the files it is given', () => {
+    expect(typeErrors({ 'a.d.ts': 'export declare const a: Missing;\n' }).map((error) => error.code)).toEqual([CANNOT_FIND_NAME]);
+  });
+
+  it('does not let one call see the files of an earlier call', () => {
+    const importer = "import { value } from './value';\nexport const copy: number = value;\n";
+
+    expect(typeErrors({ 'value.ts': 'export const value = 1;\n', 'a.ts': importer })).toEqual([]);
+    expect(typeErrors({ 'a.ts': importer }).map((error) => error.code)).toEqual([CANNOT_FIND_MODULE]);
   });
 });
 

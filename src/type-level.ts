@@ -42,7 +42,9 @@ export class ExhaustivenessError extends Error {
 }
 
 /**
- * Compiler options for the in-memory programs: strict, ESM, no libraries beyond the language's own, and no ambient types. Only what a self-contained snippet needs.
+ * Compiler options for the in-memory programs: strict, ESM, the target's default library (for ES2022 that is `lib.es2022.full.d.ts`, which includes the DOM), and no ambient types. Only what a self-contained snippet needs.
+ *
+ * `skipDefaultLibCheck` leaves TypeScript's own library files unchecked, so diagnostics cover the snippet and not the library's declarations, which otherwise dominate the cost of every program. Errors in the snippet's own files, declaration files included, are still reported.
  */
 const SNIPPET_COMPILER_OPTIONS: CompilerOptions = {
   strict: true,
@@ -51,6 +53,7 @@ const SNIPPET_COMPILER_OPTIONS: CompilerOptions = {
   module: ModuleKind.ESNext,
   moduleResolution: ModuleResolutionKind.Bundler,
   types: [],
+  skipDefaultLibCheck: true,
 };
 
 function inMemoryProject(files: Readonly<Record<string, string>>, options: CompilerOptions): Project {
@@ -63,17 +66,45 @@ function inMemoryProject(files: Readonly<Record<string, string>>, options: Compi
 }
 
 /**
+ * One project per distinct set of compiler options, kept for the life of the module so that the default library is parsed and bound once instead of once per program. {@link typeErrors} adds its files to the project and removes them before it returns, so a call never sees another call's files.
+ */
+const projectsByOptions = new Map<string, Project>();
+
+function sharedProject(options: CompilerOptions): Project {
+  const compilerOptions = { ...SNIPPET_COMPILER_OPTIONS, ...options };
+  const key = JSON.stringify(compilerOptions);
+  const existing = projectsByOptions.get(key);
+  if (existing !== undefined) {
+    return existing;
+  }
+  const project = new Project({ useInMemoryFileSystem: true, compilerOptions });
+  projectsByOptions.set(key, project);
+
+  return project;
+}
+
+/**
  * Compile the files in memory and return every error the type checker reports. Names are paths in the in-memory file system, so one file can import another with a relative path.
  */
 export function typeErrors(files: Readonly<Record<string, string>>, options: CompilerOptions = {}): readonly TypeErrorReport[] {
-  return inMemoryProject(files, options)
-    .getPreEmitDiagnostics()
-    .map((diagnostic) => ({
+  const project = sharedProject(options);
+  const added: SourceFile[] = [];
+  try {
+    for (const [name, source] of Object.entries(files)) {
+      added.push(project.createSourceFile(name, source));
+    }
+
+    return project.getPreEmitDiagnostics().map((diagnostic) => ({
       file: diagnostic.getSourceFile()?.getBaseName() ?? '',
       line: diagnostic.getLineNumber() ?? 0,
       code: diagnostic.getCode(),
       message: ts.flattenDiagnosticMessageText(diagnostic.compilerObject.messageText, '\n'),
     }));
+  } finally {
+    for (const sourceFile of added) {
+      project.removeSourceFile(sourceFile);
+    }
+  }
 }
 
 function handlerMap(source: SourceFile, map: string): ObjectLiteralExpression {
