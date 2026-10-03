@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 
 import { type EntityName, Node, type TypeAliasDeclaration } from 'ts-morph';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import type { CommandTypesOptions } from '../options';
 import { relativePosix } from '../paths';
 import { createProject } from '../ts-project';
@@ -70,7 +70,7 @@ export const commandTypes: CheckFunction<CommandTypesOptions> = async ({ cwd, op
   const excluded = new Set(options.exclude);
   const inferences = options.inferences ?? DEFAULT_INFERENCES;
   const seen = new Set<ExportedType>();
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
 
   for (const file of files) {
     for (const [name, declaration] of exportedTypes(project.getSourceFileOrThrow(resolve(cwd, file)))) {

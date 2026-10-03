@@ -1,6 +1,6 @@
-import type { GitHubCheckFunction, Violation } from '../check';
+import type { GitHubCheckFunction, RepositoryViolation } from '../check';
 import type { SettingsMergeMethodsOptions } from '../options';
-import { branchRulesOf, repositoryFile, repositoryOf } from '../settings/repository';
+import { branchRulesOf, repositoryName, repositoryOf } from '../settings/repository';
 
 const METHODS = ['rebase', 'squash', 'merge'] as const;
 
@@ -20,7 +20,7 @@ const METHOD_NAMES: Readonly<Record<MergeMethod, string>> = { rebase: 'rebase me
  */
 export const settingsMergeMethods: GitHubCheckFunction<SettingsMergeMethodsOptions> = async ({ cwd, options, github }) => {
   const slug = await repositoryOf(cwd, options);
-  const file = repositoryFile(slug);
+  const repository = repositoryName(slug);
   const settings = await github.repository(slug);
   const read = await branchRulesOf(github, slug, options);
   // A plan without rulesets applies no rule to the branch, so the repository settings alone decide which methods are available.
@@ -31,11 +31,11 @@ export const settingsMergeMethods: GitHubCheckFunction<SettingsMergeMethodsOptio
   const requiredLinearHistory = 'unavailable' in read ? false : read.rules.requiredLinearHistory;
   const rulesAllow = (method: MergeMethod): boolean => !(method === 'merge' && requiredLinearHistory) && pullRequests.every((rule) => rule.allowedMergeMethods === undefined || rule.allowedMergeMethods.includes(method));
   const available = METHODS.filter((method) => repositoryAllows[method] && rulesAllow(method));
-  const violations: Violation[] = available
+  const violations: RepositoryViolation[] = available
     .filter((method) => method !== wanted)
-    .map((method) => ({ code: 'settings-merge-methods/method-enabled', message: `${file} allows ${METHOD_NAMES[method]}; only ${METHOD_NAMES[wanted]} should be allowed`, file }));
+    .map((method) => ({ code: 'settings-merge-methods/method-enabled', message: `${repository} allows ${METHOD_NAMES[method]}; only ${METHOD_NAMES[wanted]} should be allowed`, repository }));
   if (!available.includes(wanted)) {
-    violations.push({ code: 'settings-merge-methods/method-unavailable', message: `${file} does not allow ${METHOD_NAMES[wanted]}`, file });
+    violations.push({ code: 'settings-merge-methods/method-unavailable', message: `${repository} does not allow ${METHOD_NAMES[wanted]}`, repository });
   }
 
   return violations;

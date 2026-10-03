@@ -46,8 +46,19 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Where a violation is, as text: the repository a violation of the settings is about, else the file and, when the violation has one, its position.
+ */
+function placeOf(violation: Violation): string {
+  if (violation.file === undefined) {
+    return violation.repository;
+  }
+
+  return violation.location === undefined ? violation.file : `${violation.file}:${String(violation.location.line)}:${String(violation.location.column)}`;
+}
+
 function formatViolation(violation: Violation): string {
-  const place = violation.location === undefined ? violation.file : `${violation.file}:${String(violation.location.line)}:${String(violation.location.column)}`;
+  const place = placeOf(violation);
 
   return `${place}: ${violation.code}: ${violation.message}\n`;
 }
@@ -67,12 +78,16 @@ function escapeData(value: string): string {
 }
 
 /**
- * The GitHub Actions `error` workflow command for a violation at `file` (relative to the directory the job runs in, which is how the runner places an annotation), with the violation's code as its title and its position when it has one.
+ * The GitHub Actions `error` workflow command for a violation, with its code as the title. A violation about a file is placed at its `file`, which must be relative to the directory the job runs in (that is how the runner places an annotation), and at its position when it has one; a violation about the repository names no file, so its annotation is attached to none.
  */
-export function githubAnnotation(violation: Violation, file: string): string {
-  const position = violation.location === undefined ? '' : `,line=${String(violation.location.line)},col=${String(violation.location.column)}`;
+export function githubAnnotation(violation: Violation): string {
+  const properties = [`title=${escapeProperty(violation.code)}`];
+  if (violation.file !== undefined) {
+    const position = violation.location === undefined ? [] : [`line=${String(violation.location.line)}`, `col=${String(violation.location.column)}`];
+    properties.unshift(`file=${escapeProperty(violation.file)}`, ...position);
+  }
 
-  return `::error file=${escapeProperty(file)}${position},title=${escapeProperty(violation.code)}::${escapeData(violation.message)}\n`;
+  return `::error ${properties.join(',')}::${escapeData(violation.message)}\n`;
 }
 
 function formatOf(value: string | undefined): Format {
@@ -106,7 +121,7 @@ function printResult(result: RunResult, format: Format, cwd: string, output: Com
   }
   for (const violation of result.violations) {
     if (format === 'github') {
-      output.stdout(githubAnnotation(violation, relativePosix(process.cwd(), resolve(cwd, violation.file))));
+      output.stdout(githubAnnotation(violation.file !== undefined ? { ...violation, file: relativePosix(process.cwd(), resolve(cwd, violation.file)) } : violation));
     } else {
       output.stderr(formatViolation(violation));
     }

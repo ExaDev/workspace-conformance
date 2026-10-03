@@ -11,9 +11,9 @@ export interface SourceLocation {
 }
 
 /**
- * One way the workspace fails a check.
+ * A way the workspace fails a check that is about a file.
  */
-export interface Violation {
+export interface FileViolation {
   /**
    * Stable identifier of the rule that was broken, `<check name>/<reason>`. Callers may match on it; the message may change.
    */
@@ -24,7 +24,30 @@ export interface Violation {
    */
   readonly file: string;
   readonly location?: SourceLocation;
+  readonly repository?: never;
 }
+
+/**
+ * A way the repository fails a check that reads its settings, which is about the repository and no file in it.
+ */
+export interface RepositoryViolation {
+  /**
+   * Stable identifier of the rule that was broken, `<check name>/<reason>`. Callers may match on it; the message may change.
+   */
+  readonly code: string;
+  readonly message: string;
+  /**
+   * The repository the violation is about, `owner/name`.
+   */
+  readonly repository: string;
+  readonly file?: never;
+  readonly location?: never;
+}
+
+/**
+ * One way the workspace fails a check: about a file ({@link FileViolation}, with `file`) or about the repository's settings ({@link RepositoryViolation}, with `repository`). A violation has exactly one of the two, so `violation.file === undefined` tells them apart.
+ */
+export type Violation = FileViolation | RepositoryViolation;
 
 /**
  * What every check receives.
@@ -55,12 +78,12 @@ export interface LayoutCheckContext<Options> extends CheckContext<Options> {
 /**
  * A check: reads the workspace and returns everything it finds wrong, in a stable order. It throws `ConformanceError` when it cannot run.
  */
-export type CheckFunction<Options> = (context: CheckContext<Options>) => Promise<readonly Violation[]>;
+export type CheckFunction<Options> = (context: CheckContext<Options>) => Promise<readonly FileViolation[]>;
 
 /**
  * A check that also needs the resolved workspace layout.
  */
-export type LayoutCheckFunction<Options> = (context: LayoutCheckContext<Options>) => Promise<readonly Violation[]>;
+export type LayoutCheckFunction<Options> = (context: LayoutCheckContext<Options>) => Promise<readonly FileViolation[]>;
 
 /**
  * What a check that reads repository settings through the GitHub API receives.
@@ -70,9 +93,9 @@ export interface GitHubCheckContext<Options> extends CheckContext<Options> {
 }
 
 /**
- * A check that reads repository settings through the GitHub API. Its violations name the repository (`owner/name`) as the file.
+ * A check that reads repository settings through the GitHub API. Its violations are about the repository, which they name as `owner/name`.
  */
-export type GitHubCheckFunction<Options> = (context: GitHubCheckContext<Options>) => Promise<readonly Violation[]>;
+export type GitHubCheckFunction<Options> = (context: GitHubCheckContext<Options>) => Promise<readonly RepositoryViolation[]>;
 
 /**
  * What a check that reads files, and the repository's settings too when it can, receives.
@@ -87,4 +110,4 @@ export interface SettingsAwareCheckContext<Options> extends CheckContext<Options
 /**
  * A check that reads files and refines its judgement with the repository's settings when the run is given a GitHub client. It runs offline too, unlike a {@link GitHubCheckFunction}.
  */
-export type SettingsAwareCheckFunction<Options> = (context: SettingsAwareCheckContext<Options>) => Promise<readonly Violation[]>;
+export type SettingsAwareCheckFunction<Options> = (context: SettingsAwareCheckContext<Options>) => Promise<readonly FileViolation[]>;

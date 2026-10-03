@@ -2,7 +2,7 @@ import { posix } from 'node:path';
 
 import { isDynamicPattern } from 'tinyglobby';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { findDirectories } from '../files';
 import { blobContent, GIT_SYMLINK_MODE, type IndexEntry, indexEntry } from '../git';
 import type { InstructionSymlinksOptions } from '../options';
@@ -53,7 +53,7 @@ async function leadsTo(cwd: string, file: string, entry: IndexEntry, destination
 export const instructionSymlinks: CheckFunction<InstructionSymlinksOptions> = async ({ cwd, options }) => {
   const files = options.files ?? DEFAULT_INSTRUCTION_FILES;
   const target = options.target ?? DEFAULT_INSTRUCTION_TARGET;
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
 
   for (const directory of await directoriesOf(cwd, options.directories ?? ['.'])) {
     const readme = posix.join(directory, target);

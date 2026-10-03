@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { posix, resolve } from 'node:path';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { findDirectories } from '../files';
 import type { AggregateMappersOptions } from '../options';
 import { relativePosix } from '../paths';
@@ -17,7 +17,7 @@ import { declarationLocation, exportedTypes } from './exported-types';
 export const aggregateMappers: CheckFunction<AggregateMappersOptions> = async ({ cwd, options }) => {
   const { project, files } = await createProject(cwd, options.tsConfig, options.contracts, { check: 'aggregate-mappers', files: 'contracts' });
   const excluded = new Set(options.exclude);
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
 
   for (const contract of files) {
     const contractDir = posix.dirname(contract);

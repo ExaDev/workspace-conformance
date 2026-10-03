@@ -5,7 +5,7 @@ import type { LayoutConfig } from '@exadev/config';
 import type { IAvailableTranspiler, IViolation } from 'dependency-cruiser';
 import type { ParsedCommandLine } from 'typescript';
 
-import type { LayoutCheckContext, Violation } from '../check';
+import type { LayoutCheckContext, FileViolation } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { relativePosix } from '../paths';
@@ -63,7 +63,7 @@ export interface ImportCheckSpec {
   /**
    * The violations for the findings of this check's rules, in a stable order.
    */
-  readonly report: (findings: readonly IViolation[], scope: ImportScope) => readonly Violation[];
+  readonly report: (findings: readonly IViolation[], scope: ImportScope) => readonly FileViolation[];
 }
 
 /**
@@ -168,7 +168,7 @@ export async function runImportChecks(input: {
   readonly cwd: string;
   readonly layout: LayoutConfig;
   readonly entries: readonly ImportCheckEntry[];
-}): Promise<ReadonlyMap<string, readonly Violation[]>> {
+}): Promise<ReadonlyMap<string, readonly FileViolation[]>> {
   const { cwd, layout, entries } = input;
   const root = workspaceRoot(cwd, layout);
   const packages = await readWorkspacePackages(cwd, layout);
@@ -229,7 +229,7 @@ export async function runImportChecks(input: {
 /**
  * Run one import check on its own.
  */
-export async function runImportCheck(context: LayoutCheckContext<ImportGraphOptions>, spec: ImportCheckSpec): Promise<readonly Violation[]> {
+export async function runImportCheck(context: LayoutCheckContext<ImportGraphOptions>, spec: ImportCheckSpec): Promise<readonly FileViolation[]> {
   const results = await runImportChecks({ cwd: context.cwd, layout: context.layout, entries: [{ spec, options: context.options }] });
 
   return results.get(spec.name) ?? [];
@@ -245,7 +245,7 @@ export function edgeReport(spec: {
 }): ImportCheckSpec['report'] {
   return (findings, { cwd, root, packages, judged }) =>
     findings
-      .flatMap((finding): readonly Violation[] => {
+      .flatMap((finding): readonly FileViolation[] => {
         const from = packageOfPath(packages, finding.from);
         const to = packageOfPath(packages, finding.to);
 

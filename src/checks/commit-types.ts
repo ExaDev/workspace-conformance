@@ -1,6 +1,6 @@
 import type { ConfigFileOptions } from '@exadev/config';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { evaluateConfigFile, isRecord } from '../config-files';
 import { ConformanceError } from '../errors';
 import type { CommitTypesOptions } from '../options';
@@ -110,7 +110,7 @@ export const commitTypes: CheckFunction<CommitTypesOptions> = async ({ cwd, opti
   const releaseFile = options.release ?? DEFAULT_RELEASE_CONFIG;
   const commitlint = await readObject(cwd, commitlintFile, configFiles);
   const release = await readObject(cwd, releaseFile, configFiles);
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   if (commitlint === undefined) {
     violations.push({ code: 'commit-types/missing-config', message: `${commitlintFile} does not exist`, file: commitlintFile });
   }

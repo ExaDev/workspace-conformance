@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 
 import { type ExportedDeclarations, type ModuleDeclaration, Node, type SourceFile } from 'ts-morph';
 
-import type { CheckFunction, SourceLocation, Violation } from '../check';
+import type { CheckFunction, SourceLocation, FileViolation } from '../check';
 import { ConformanceError } from '../errors';
 import type { CodecPairsOptions } from '../options';
 import { relativePosix } from '../paths';
@@ -84,7 +84,7 @@ export const codecPairs: CheckFunction<CodecPairsOptions> = async ({ cwd, option
     { template: encoder, counterpart: decoder, missing: 'decoder' },
     { template: decoder, counterpart: encoder, missing: 'encoder' },
   ];
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
 
   for (const file of files) {
     const values = exportedValues(project.getSourceFileOrThrow(resolve(cwd, file)));

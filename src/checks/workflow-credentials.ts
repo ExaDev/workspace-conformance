@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { isRecord } from '../config-files';
 import type { WorkflowCredentialsOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
@@ -96,7 +96,7 @@ function tokenReads(job: Job, step: Step, publishes: readonly string[], npmrcVar
   return reads.filter((read, index) => reads.findIndex((other) => other.variable === read.variable) === index);
 }
 
-function attestationViolations(workflow: Workflow, job: Job): readonly Violation[] {
+function attestationViolations(workflow: Workflow, job: Job): readonly FileViolation[] {
   const permissions = effectivePermissions(workflow, job);
 
   return job.steps
@@ -118,7 +118,7 @@ function passesToken(workflow: Workflow, job: Job, variables: readonly string[])
   return [undefined, ...job.steps].some((step) => variables.some((variable) => (effectiveEnv(workflow, job, step)[variable] ?? '') !== ''));
 }
 
-function tokenlessPublishViolations(workflow: Workflow, job: Job, provenanceInManifest: boolean, npmrcVariables: readonly string[]): readonly Violation[] {
+function tokenlessPublishViolations(workflow: Workflow, job: Job, provenanceInManifest: boolean, npmrcVariables: readonly string[]): readonly FileViolation[] {
   if (accessOf(effectivePermissions(workflow, job), 'id-token') !== 'write' || passesToken(workflow, job, [...REGISTRY_TOKEN_VARIABLES, ...npmrcVariables])) {
     return [];
   }

@@ -1,10 +1,10 @@
-import type { SourceLocation, Violation } from '../check';
+import type { SourceLocation, FileViolation } from '../check';
 import type { Job, Step, Workflow } from './model';
 
 /**
  * A violation about a place in a workflow file.
  */
-export function workflowViolation(workflow: Workflow, code: string, message: string, location: SourceLocation): Violation {
+export function workflowViolation(workflow: Workflow, code: string, message: string, location: SourceLocation): FileViolation {
   return { code, message, file: workflow.file, location };
 }
 

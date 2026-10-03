@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 
 import { type ExpressionWithTypeArguments, type InterfaceDeclaration, Node, SyntaxKind, type TypeAliasDeclaration, type TypeNode, type TypeReferenceNode } from 'ts-morph';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { ConformanceError } from '../errors';
 import { findFiles } from '../files';
 import type { DerivedTypesOptions, DerivedTypesPair } from '../options';
@@ -118,7 +118,7 @@ function derivedDeclaration(declaration: InterfaceDeclaration | TypeAliasDeclara
   return derivedType(declaration.getTypeNodeOrThrow(), derivation);
 }
 
-async function pairViolations(cwd: string, options: DerivedTypesOptions, pair: DerivedTypesPair, index: number): Promise<readonly Violation[]> {
+async function pairViolations(cwd: string, options: DerivedTypesOptions, pair: DerivedTypesPair, index: number): Promise<readonly FileViolation[]> {
   const { project, files } = await createProject(cwd, options.tsConfig, pair.types, { check: 'derived-types', files: `pairs.${String(index)}.types` });
   const schemaFiles = await findFiles(cwd, pair.schemas);
   if (schemaFiles.length === 0) {
@@ -127,7 +127,7 @@ async function pairViolations(cwd: string, options: DerivedTypesOptions, pair: D
   const excluded = new Set(options.exclude);
   const derivation: Derivation = { inferences: new Set(options.inferences ?? DEFAULT_DERIVED_TYPE_INFERENCES), schemaFiles: new Set(schemaFiles), cwd, followed: new Set() };
   const seen = new Set<ExportedType>();
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
 
   for (const file of files) {
     for (const [name, declaration] of exportedTypes(project.getSourceFileOrThrow(resolve(cwd, file)))) {
@@ -155,7 +155,7 @@ async function pairViolations(cwd: string, options: DerivedTypesOptions, pair: D
  * The definition is followed through aliases and interfaces without type parameters, in any file, and through the arguments of other generics, intersections, unions whose members are all derived (`null` and `undefined` aside), arrays, type operators and indexed access. A type literal, and a schema passed to a generic that is not an inference, are written by hand.
  */
 export const derivedTypes: CheckFunction<DerivedTypesOptions> = async ({ cwd, options }) => {
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const [index, pair] of options.pairs.entries()) {
     violations.push(...(await pairViolations(cwd, options, pair, index)));
   }

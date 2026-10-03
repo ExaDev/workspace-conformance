@@ -1,4 +1,4 @@
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import type { PinningLevel, WorkflowActionPinningOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { parseUses, type UsesReference } from '../workflows/model';
@@ -44,7 +44,7 @@ function problem(reference: UsesReference, options: WorkflowActionPinningOptions
  * The check encodes whichever policy the options state and is never silent about it: with nothing configured every remote reference must be a SHA. Limits: it checks the form of the ref, not that the SHA belongs to the repository or to a release; a SHA written with a trailing version comment is read as the SHA; composite actions are not read.
  */
 export const workflowActionPinning: CheckFunction<WorkflowActionPinningOptions> = async ({ cwd, options }) => {
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const workflow of await loadWorkflows(cwd, options)) {
     const uses = [
       ...workflow.jobs.flatMap((job) => (job.uses === undefined ? [] : [{ value: job.uses, location: job.location }])),

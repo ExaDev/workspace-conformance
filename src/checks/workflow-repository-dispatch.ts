@@ -1,4 +1,4 @@
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import type { WorkflowRepositoryDispatchOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { effectiveEnv, type Job, type Step, type Workflow } from '../workflows/model';
@@ -112,10 +112,10 @@ function checkoutRefOtherThanDefault(job: Job, branches: readonly string[]): boo
   return job.steps.some((step) => stepUses(step, CHECKOUT_ACTION) && step.with['ref'] !== undefined && !isDefaultBranch(step.with['ref'], branches));
 }
 
-function stepViolations(context: Context, step: Step, onOtherBranch: boolean): readonly Violation[] {
+function stepViolations(context: Context, step: Step, onOtherBranch: boolean): readonly FileViolation[] {
   const { workflow, job, branches } = context;
   const lines = scriptCommands(step.run);
-  const found: Violation[] = [];
+  const found: FileViolation[] = [];
   const report = (reason: string, message: string): void => {
     found.push(workflowViolation(workflow, `workflow-repository-dispatch/${reason}`, message, step.location));
   };
@@ -150,9 +150,9 @@ function stepViolations(context: Context, step: Step, onOtherBranch: boolean): r
   return found;
 }
 
-function jobViolations(context: Context): readonly Violation[] {
+function jobViolations(context: Context): readonly FileViolation[] {
   let onOtherBranch = checkoutRefOtherThanDefault(context.job, context.branches);
-  const found: Violation[] = [];
+  const found: FileViolation[] = [];
   for (const step of context.job.steps) {
     found.push(...stepViolations(context, step, onOtherBranch));
     onOtherBranch ||= scriptCommands(step.run).some((line) => BRANCH_CREATION.test(line));

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { copyFixture, fixturePath, removeTempDirs, writeFiles } from '../test/support/temp';
+import { copyFixture, fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../test/support/temp';
 import { githubAnnotation, runCommand } from './cli-command';
 import { checkNames } from './registry';
 import { EXIT_CODES, type RunResult } from './run-checks';
@@ -237,14 +237,66 @@ describe('check --format', () => {
   });
 });
 
+describe('a violation that names the repository rather than a file', () => {
+  const REPOSITORY = 'example-org/example-repo';
+  const CODE = 'settings-review-thread-resolution/not-required';
+  const MESSAGE = `no rule requires review conversations to be resolved before merging on the branch of ${REPOSITORY}`;
+
+  /**
+   * A workspace whose only enabled check reads the settings of {@link REPOSITORY}, and a GitHub API that answers for a repository whose branch has no rules, so that check reports one violation.
+   */
+  async function settingsWorkspace(): Promise<string> {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, { 'exadev.conformance.config.ts': `export default { checks: { 'settings-review-thread-resolution': { repository: '${REPOSITORY}' } } };\n` });
+    vi.stubEnv('GITHUB_TOKEN', 'test-token');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async (input) =>
+        Promise.resolve(Response.json(new Request(input).url.endsWith(`/repos/${REPOSITORY}`) ? { default_branch: 'main', allow_rebase_merge: true, allow_squash_merge: false, allow_merge_commit: false } : [])),
+      ),
+    );
+
+    return cwd;
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('is printed as an annotation attached to no file with github', async () => {
+    const result = await run('check', '--settings', '--cwd', await settingsWorkspace(), '--format', 'github');
+
+    expect(result).toEqual({ code: EXIT_CODES.violations, stdout: `::error title=${CODE}::${MESSAGE}\n`, stderr: '' });
+  });
+
+  it('is printed as the repository, the code and the message with text', async () => {
+    const result = await run('check', '--settings', '--cwd', await settingsWorkspace());
+
+    expect(result).toEqual({ code: EXIT_CODES.violations, stdout: '', stderr: `${REPOSITORY}: ${CODE}: ${MESSAGE}\n` });
+  });
+
+  it('names the repository and no file in json', async () => {
+    const result = await run('check', '--settings', '--cwd', await settingsWorkspace(), '--format', 'json');
+    const parsed: unknown = JSON.parse(result.stdout);
+
+    expect(parsed).toMatchObject({ violations: [{ code: CODE, message: MESSAGE, repository: REPOSITORY }] });
+    expect(parsed).not.toHaveProperty(['violations', 0, 'file']);
+  });
+});
+
 describe('githubAnnotation', () => {
   it('escapes the characters a workflow command reserves, in the properties and in the message', () => {
-    expect(githubAnnotation({ code: 'a/b', message: '100% sure,\nnext: line', file: 'dir,x/file:1.ts', location: { line: 3, column: 4 } }, 'dir,x/file:1.ts')).toBe(
+    expect(githubAnnotation({ code: 'a/b', message: '100% sure,\nnext: line', file: 'dir,x/file:1.ts', location: { line: 3, column: 4 } })).toBe(
       '::error file=dir%2Cx/file%3A1.ts,line=3,col=4,title=a/b::100%25 sure,%0Anext: line\n',
     );
   });
 
   it('leaves out the position of a violation that has none', () => {
-    expect(githubAnnotation({ code: 'c/d', message: 'm', file: 'f' }, 'f')).toBe('::error file=f,title=c/d::m\n');
+    expect(githubAnnotation({ code: 'c/d', message: 'm', file: 'f' })).toBe('::error file=f,title=c/d::m\n');
+  });
+
+  it('leaves out the file of a violation that names the repository, even one written like a path', () => {
+    expect(githubAnnotation({ code: 'e/f', message: 'm', repository: 'example-org/example-repo' })).toBe('::error title=e/f::m\n');
   });
 });

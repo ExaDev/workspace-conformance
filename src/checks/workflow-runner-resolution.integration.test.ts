@@ -1,17 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../../test/support/temp';
-import type { Violation } from '../check';
+import { where } from '../../test/support/violations';
+import type { FileViolation } from '../check';
 import { DEFAULT_HOSTED_LABELS, workflowRunnerResolution } from './workflow-runner-resolution';
 
 afterEach(removeTempDirs);
-
-/**
- * What a violation is, without its prose: the code, then the file and the line.
- */
-function where(violations: readonly Violation[]): readonly string[] {
-  return violations.map((violation) => `${violation.code} ${violation.file}${violation.location === undefined ? '' : `:${String(violation.location.line)}`}`);
-}
 
 function fixture(check: string, kind: string): string {
   return fixturePath('workflows', check, kind);
@@ -143,7 +137,7 @@ ${withBlock}  build:
 `;
     const RESOLVE = '.github/workflows/resolve.yml';
 
-    async function judge(input: string, withBlock: string, hostedLabels?: readonly string[]): Promise<readonly Violation[]> {
+    async function judge(input: string, withBlock: string, hostedLabels?: readonly string[]): Promise<readonly FileViolation[]> {
       const cwd = await makeTempDir();
       await writeFiles(cwd, { [RESOLVE]: resolve(input), [CI]: caller(withBlock) });
 

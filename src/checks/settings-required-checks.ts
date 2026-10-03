@@ -1,6 +1,6 @@
-import type { GitHubCheckFunction, Violation } from '../check';
+import type { GitHubCheckFunction, RepositoryViolation } from '../check';
 import type { SettingsRequiredChecksOptions } from '../options';
-import { branchRulesOf, repositoryFile, repositoryOf, rulesUnavailableMessage } from '../settings/repository';
+import { branchRulesOf, repositoryName, repositoryOf, rulesUnavailableMessage } from '../settings/repository';
 import { loadWorkflows } from '../workflows/load';
 import { DEFAULT_JUNCTION_JOBS, jobsNamed } from '../workflows/shared';
 
@@ -13,28 +13,28 @@ import { DEFAULT_JUNCTION_JOBS, jobsNamed } from '../workflows/shared';
  */
 export const settingsRequiredChecks: GitHubCheckFunction<SettingsRequiredChecksOptions> = async ({ cwd, options, github }) => {
   const slug = await repositoryOf(cwd, options);
-  const file = repositoryFile(slug);
+  const repository = repositoryName(slug);
   const read = await branchRulesOf(github, slug, options);
   if ('unavailable' in read) {
-    return [{ code: 'settings-required-checks/rules-unavailable', message: rulesUnavailableMessage(file, 'a status check', read.unavailable), file }];
+    return [{ code: 'settings-required-checks/rules-unavailable', message: rulesUnavailableMessage(repository, 'a status check', read.unavailable), repository }];
   }
   const { rules } = read;
   const junctions = (await loadWorkflows(cwd, options)).flatMap((workflow) => jobsNamed(workflow, options.junctionJobs ?? DEFAULT_JUNCTION_JOBS).map((job) => ({ workflow, name: job.name ?? job.id })));
-  const violations: Violation[] = [];
+  const violations: RepositoryViolation[] = [];
   if (junctions.length === 0) {
-    violations.push({ code: 'settings-required-checks/no-junction-job', message: 'no workflow has a junction job, so there is no check that reports for the whole workflow to require', file });
+    violations.push({ code: 'settings-required-checks/no-junction-job', message: 'no workflow has a junction job, so there is no check that reports for the whole workflow to require', repository });
   }
   if (rules.requiredStatusChecks.length === 0) {
-    violations.push({ code: 'settings-required-checks/no-required-checks', message: `no rule requires status checks on the branch of ${file}`, file });
+    violations.push({ code: 'settings-required-checks/no-required-checks', message: `no rule requires status checks on the branch of ${repository}`, repository });
 
     return violations;
   }
   const required = new Set(rules.requiredStatusChecks.flatMap((rule) => rule.contexts));
   for (const { workflow, name } of junctions.filter((junction) => !required.has(junction.name))) {
-    violations.push({ code: 'settings-required-checks/required-check-missing', message: `${file} does not require the check '${name}' of ${workflow.file}`, file });
+    violations.push({ code: 'settings-required-checks/required-check-missing', message: `${repository} does not require the check '${name}' of ${workflow.file}`, repository });
   }
   if (!rules.requiredStatusChecks.some((rule) => rule.strict)) {
-    violations.push({ code: 'settings-required-checks/not-strict', message: `${file} does not require branches to be up to date before merging`, file });
+    violations.push({ code: 'settings-required-checks/not-strict', message: `${repository} does not require branches to be up to date before merging`, repository });
   }
 
   return violations;
