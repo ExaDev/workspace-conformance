@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/ExaDev/workspace-conformance/compare/v2.0.1...v2.0.2) (2026-10-03)
+
+
+### Performance Improvements
+
+* **type-level:** parse the default library once and skip checking it ([9bfcf78](https://github.com/ExaDev/workspace-conformance/commit/9bfcf789c343a003863a03ae1de15ee0f11fbbc5))
+
 ## [2.0.1](https://github.com/ExaDev/workspace-conformance/compare/v2.0.0...v2.0.1) (2026-10-03)
 
 # [2.0.0](https://github.com/ExaDev/workspace-conformance/compare/v1.7.0...v2.0.0) (2026-10-03)
