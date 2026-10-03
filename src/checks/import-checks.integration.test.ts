@@ -178,6 +178,42 @@ describe('imports of a package by name', () => {
   });
 });
 
+describe('declared dependencies', () => {
+  const layout = { groups: [{ name: 'core', rank: 0 }, { name: 'features', rank: 1, slice: { segment: 0 } }] };
+  const workspace = (kernelManifest: string, kernelTest: string): Readonly<Record<string, string>> => ({
+    'pnpm-workspace.yaml': 'packages:\n  - core/*\n  - features/*\n',
+    'core/kernel/package.json': kernelManifest,
+    'core/kernel/src/index.ts': 'export const kernel = 1;\n',
+    'core/kernel/src/index.unit.test.ts': kernelTest,
+    'features/billing/package.json': '{ "name": "@fx/billing" }',
+    'features/billing/src/index.ts': 'export const billing = 1;\n',
+  });
+  const byName = "import { billing } from '@fx/billing';\nexport const used = billing;\n";
+  const byPath = "import { billing } from '../../../features/billing/src/index';\nexport const used = billing;\n";
+
+  async function uphillFiles(kernelManifest: string, kernelTest: string, dependencyFields?: readonly string[]): Promise<readonly string[]> {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, workspace(kernelManifest, kernelTest));
+
+    return (await importUphill({ cwd, layout: dependencyFields === undefined ? layout : { ...layout, dependencyFields }, options: {} })).map((violation) => violation.file);
+  }
+
+  it('do not judge an import of a package declared only in fields the layout does not read, as the ESLint rules do not', async () => {
+    const devOnly = '{ "name": "@fx/kernel", "devDependencies": { "@fx/billing": "workspace:*" } }';
+
+    expect(await uphillFiles(devOnly, byName)).toEqual([]);
+    expect(await uphillFiles(devOnly, byPath)).toEqual([]);
+    expect(await uphillFiles(devOnly, byName, ['dependencies', 'devDependencies'])).toEqual(['core/kernel/src/index.unit.test.ts']);
+  });
+
+  it('judge an import of a package declared in a field the layout reads, or not declared at all', async () => {
+    const both = '{ "name": "@fx/kernel", "dependencies": { "@fx/billing": "workspace:*" }, "devDependencies": { "@fx/billing": "workspace:*" } }';
+
+    expect(await uphillFiles(both, byName)).toEqual(['core/kernel/src/index.unit.test.ts']);
+    expect(await uphillFiles('{ "name": "@fx/kernel" }', byPath)).toEqual(['core/kernel/src/index.unit.test.ts']);
+  });
+});
+
 describe('import cycles', () => {
   const layout = { groups: [{ name: 'core', rank: 0 }] };
   const base = { 'pnpm-workspace.yaml': 'packages:\n  - core/*\n' };

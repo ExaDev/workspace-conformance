@@ -6,6 +6,7 @@ import type { GroupSpec, LayoutConfig } from '@exadev/config';
 import { glob } from 'tinyglobby';
 import { parse } from 'yaml';
 
+import { isRecord } from '../config-files';
 import { ConformanceError } from '../errors';
 import { INSTALLED_DEPENDENCIES_GLOB } from '../files';
 
@@ -258,4 +259,47 @@ export async function readWorkspacePackages(cwd: string, layout: LayoutConfig): 
   }
 
   return classifyPackages(discovered, layout);
+}
+
+/**
+ * The `package.json` fields a package's declared dependencies are read from when the layout's `dependencyFields` is omitted, the default of the ESLint workspace rules that read the same layout.
+ */
+export const DEFAULT_DEPENDENCY_FIELDS: readonly string[] = ['dependencies'];
+
+/**
+ * The fields npm and pnpm install dependencies from, read alongside the layout's own so that a dependency declared outside them can be told apart from one not declared at all.
+ */
+const MANIFEST_DEPENDENCY_FIELDS: readonly string[] = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+
+/**
+ * For each package directory, the fields its `package.json` declares each dependency in: the manifest dependency fields and any other the layout's `dependencyFields` names.
+ */
+export async function readDeclaredDependencies(root: string, packages: readonly WorkspacePackage[], layout: LayoutConfig): Promise<ReadonlyMap<string, ReadonlyMap<string, readonly string[]>>> {
+  const fields = [...new Set([...MANIFEST_DEPENDENCY_FIELDS, ...(layout.dependencyFields ?? DEFAULT_DEPENDENCY_FIELDS)])];
+
+  return new Map(
+    await Promise.all(
+      packages.map(async (member): Promise<readonly [string, ReadonlyMap<string, readonly string[]>]> => {
+        const manifest = join(root, member.dir, 'package.json');
+        let content: unknown;
+        try {
+          content = JSON.parse(await readFile(manifest, 'utf8'));
+        } catch (error) {
+          throw new ConformanceError(`${manifest} cannot be read as JSON`, { cause: error });
+        }
+        if (!isRecord(content)) {
+          throw new ConformanceError(`${manifest} is not a JSON object`);
+        }
+        const declared = new Map<string, readonly string[]>();
+        for (const field of fields) {
+          const entries = content[field];
+          for (const name of isRecord(entries) ? Object.keys(entries) : []) {
+            declared.set(name, [...(declared.get(name) ?? []), field]);
+          }
+        }
+
+        return [member.dir, declared];
+      }),
+    ),
+  );
 }

@@ -9,7 +9,7 @@ import type { LayoutCheckContext, Violation } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { relativePosix } from '../paths';
-import { isInPackage, type WorkspacePackage, readWorkspacePackages, workspaceRoot } from '../workspace/packages';
+import { DEFAULT_DEPENDENCY_FIELDS, isInPackage, readDeclaredDependencies, type WorkspacePackage, readWorkspacePackages, workspaceRoot } from '../workspace/packages';
 import { graphScopePattern, type ImportRule } from '../workspace/rules';
 
 /**
@@ -42,6 +42,10 @@ export interface ImportScope {
    */
   readonly root: string;
   readonly packages: readonly WorkspacePackage[];
+  /**
+   * Whether an import from one package of another is judged: unless the importer declares the imported package, and only in fields the layout's `dependencyFields` does not read. The ESLint workspace rules read the same layout and do not see such a declaration, so a test-only `devDependencies` edge is exempt from both by default. An import of a package not declared at all is judged, since it is what a declaration would have hidden from ESLint.
+   */
+  readonly judged: (from: WorkspacePackage, to: WorkspacePackage) => boolean;
 }
 
 /**
@@ -168,7 +172,14 @@ export async function runImportChecks(input: {
   const { cwd, layout, entries } = input;
   const root = workspaceRoot(cwd, layout);
   const packages = await readWorkspacePackages(cwd, layout);
-  const scope: ImportScope = { cwd, root, packages };
+  const declared = await readDeclaredDependencies(root, packages, layout);
+  const read = new Set(layout.dependencyFields ?? DEFAULT_DEPENDENCY_FIELDS);
+  const judged = (from: WorkspacePackage, to: WorkspacePackage): boolean => {
+    const fields = to.name === undefined ? undefined : declared.get(from.dir)?.get(to.name);
+
+    return fields === undefined || fields.some((field) => read.has(field));
+  };
+  const scope: ImportScope = { cwd, root, packages, judged };
   const contributions = entries.map((entry) => ({ ...entry, rules: entry.spec.rules(packages, layout) }));
 
   const groups = new Map<string, { readonly options: ImportGraphOptions; readonly members: typeof contributions[number][] }>();
@@ -225,24 +236,28 @@ export async function runImportCheck(context: LayoutCheckContext<ImportGraphOpti
 }
 
 /**
- * The report of a check whose every rule forbids one package importing another: one violation per finding, at the importing file, ordered by file and message.
+ * The report of a check whose every rule forbids one package importing another: one violation per finding the scope judges, at the importing file, ordered by file and message.
  */
 export function edgeReport(spec: {
   readonly name: string;
   readonly reason: string;
   readonly message: (edge: ImportEdge) => string;
 }): ImportCheckSpec['report'] {
-  return (findings, { cwd, root, packages }) =>
+  return (findings, { cwd, root, packages, judged }) =>
     findings
-      .map((finding): Violation => {
+      .flatMap((finding): readonly Violation[] => {
         const from = packageOfPath(packages, finding.from);
         const to = packageOfPath(packages, finding.to);
 
-        return {
-          code: `${spec.name}/${spec.reason}`,
-          message: spec.message({ from, to, fromFile: finding.from, toFile: finding.to }),
-          file: relativePosix(cwd, join(root, finding.from)),
-        };
+        return judged(from, to)
+          ? [
+              {
+                code: `${spec.name}/${spec.reason}`,
+                message: spec.message({ from, to, fromFile: finding.from, toFile: finding.to }),
+                file: relativePosix(cwd, join(root, finding.from)),
+              },
+            ]
+          : [];
       })
       .sort((a, b) => a.file.localeCompare(b.file) || a.message.localeCompare(b.message));
 }
