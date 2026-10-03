@@ -7,6 +7,7 @@ import type { CommandTypesOptions } from '../options';
 import { relativePosix } from '../paths';
 import { createProject } from '../ts-project';
 import { declarationLocation, exportedTypes, type ExportedType } from './exported-types';
+import { declarationsOf, lastIdentifier, referenceNames } from './type-references';
 
 /**
  * The last names of the generics that turn a schema into its type, used when the options name none: `z.infer`, `z.input`, `z.output`, `z.TypeOf` and Valibot's `InferInput` and `InferOutput`.
@@ -19,22 +20,10 @@ export const DEFAULT_INFERENCES: readonly string[] = ['infer', 'input', 'output'
 const STANDARD_SCHEMA_MEMBER = '~standard';
 
 /**
- * The names a type reference goes by: the last name as written, and the name it was declared with when that differs, as for `Infer` in `import type { infer as Infer } from 'zod'`, which is also `infer`. A library may itself re-export a generic under another name, so both count.
- */
-function namesOf(typeName: EntityName): readonly string[] {
-  const identifier = Node.isQualifiedName(typeName) ? typeName.getRight() : typeName;
-  const symbol = identifier.getSymbol();
-  const declared = (symbol?.getAliasedSymbol() ?? symbol)?.getName();
-
-  return declared === undefined ? [identifier.getText()] : [...new Set([identifier.getText(), declared])];
-}
-
-/**
  * The local alias without type parameters that a type reference names, or `undefined` when it names anything else. Such an alias is a name for the type it is written as, so it is judged by that.
  */
 function aliasNamed(typeName: EntityName): TypeAliasDeclaration | undefined {
-  const symbol = typeName.getSymbol();
-  const declaration = (symbol?.getAliasedSymbol() ?? symbol)?.getDeclarations().find(Node.isTypeAliasDeclaration);
+  const declaration = declarationsOf(lastIdentifier(typeName)).find(Node.isTypeAliasDeclaration);
 
   return declaration?.getTypeParameters().length === 0 ? declaration : undefined;
 }
@@ -53,7 +42,7 @@ function problem(
   }
   const written = declaration.getTypeNode();
   if (Node.isTypeReference(written)) {
-    const inference = namesOf(written.getTypeName()).find((candidate) => inferences.includes(candidate));
+    const inference = referenceNames(written.getTypeName()).find((candidate) => inferences.includes(candidate));
     if (inference !== undefined) {
       const [argument] = written.getTypeArguments();
       if (argument !== undefined && Node.isTypeQuery(argument) && argument.getExprName().getType().getProperty(STANDARD_SCHEMA_MEMBER) !== undefined) {
