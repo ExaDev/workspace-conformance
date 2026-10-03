@@ -15,10 +15,19 @@ if [ -z "$typescript_version" ]; then
   typescript_version=$(node -p "require(process.argv[1]).devDependencies.typescript" "$here/../../package.json")
 fi
 
+# The @exadev/config a consumer installs beside the tool for its config file: the range the package itself depends on, as the README tells consumers, so the scratch project holds one copy of it, as theirs would.
+config_range=$(node -p "require(process.argv[1]).dependencies['@exadev/config']" "$here/../../package.json")
+
 mkdir -p "$scratch"
 cd "$scratch"
 npm init -y > /dev/null
-npm install --engine-strict "$pack_dir"/*.tgz "cosmiconfig@$cosmiconfig_major" "typescript@$typescript_version" @exadev/config
+npm install --engine-strict "$pack_dir"/*.tgz "cosmiconfig@$cosmiconfig_major" "typescript@$typescript_version" "@exadev/config@$config_range"
+# One copy of @exadev/config: a second would mean the config file's sections come from a different copy than the one the tool reads them with.
+copies=$(find node_modules -path '*/@exadev/config/package.json' | wc -l | tr -d ' ')
+if [ "$copies" != 1 ]; then
+  echo "expected one copy of @exadev/config, found $copies" >&2
+  exit 1
+fi
 
 cp "$here/check.mjs" "$here/check.cjs" .
 

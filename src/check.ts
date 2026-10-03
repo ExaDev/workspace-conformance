@@ -36,7 +36,7 @@ export interface CheckContext<Options> {
   readonly cwd: string;
   readonly options: Options;
   /**
-   * How config files that a check evaluates itself (the commitlint and release configs of `commit-types`) are loaded. Only `alias` and `fsCache` apply to evaluating a file; `trust` and `merge` are for `extends`. No transpile cache is written when omitted.
+   * How config files that a check evaluates itself (the commitlint and release configs of `commit-types`) are loaded. Only `alias` and `fsCache` apply to evaluating a file; `trust` and the per-shape `unified` and `standalone` layer options are for `extends`. No transpile cache is written when omitted.
    */
   readonly configFiles?: ConfigFileOptions;
 }
