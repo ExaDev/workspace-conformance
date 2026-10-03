@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { deployToolNames, generatorNames } from './migrations/adapters';
 import type { CheckName, CheckOptionsByName } from './options';
+import { NAME_TEMPLATE_REQUIREMENT, parseNameTemplate } from './template';
 
 /**
  * The `checks` map of the `conformance` section: a check runs when its name is present with an options object (`{}` for the defaults), and `false` turns it off, which lets a config that extends another switch one of its checks off.
@@ -35,6 +36,11 @@ function compiles(source: string): boolean {
  */
 const pattern = z.string().min(1).refine(compiles, 'not a valid regular expression');
 const patterns = z.array(pattern);
+
+/**
+ * A name template of `codec-pairs`.
+ */
+const nameTemplate = z.string().refine((template) => parseNameTemplate(template) !== undefined, NAME_TEMPLATE_REQUIREMENT);
 
 const severity = z.enum(['warn', 'error']);
 const requiredRules = z.record(z.string().min(1), severity);
@@ -70,6 +76,13 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
         exclude: z.exactOptional(names),
         tsConfig: z.exactOptional(path),
       }),
+    ),
+  ),
+  'codec-pairs': z.exactOptional(
+    enabled(
+      z
+        .strictObject({ codecs: paths, encoder: nameTemplate, decoder: nameTemplate, exclude: z.exactOptional(names), tsConfig: z.exactOptional(path) })
+        .refine((options) => options.encoder !== options.decoder, { path: ['decoder'], message: 'the decoder template is the encoder template, so every name would be its own pair' }),
     ),
   ),
   'command-types': z.exactOptional(

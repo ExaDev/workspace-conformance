@@ -2,6 +2,7 @@ import type { ConfigFileOptions, LayoutConfig } from '@exadev/config';
 
 import type { CheckFunction, GitHubCheckFunction, Violation } from './check';
 import { aggregateMappers } from './checks/aggregate-mappers';
+import { codecPairs } from './checks/codec-pairs';
 import { commandTypes } from './checks/command-types';
 import { commitTypes } from './checks/commit-types';
 import { derivedTypes } from './checks/derived-types';
@@ -170,6 +171,12 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: 'Every exported aggregate type in a contract file has a mapper file where the template puts it',
     select: (checks) => enabledOptions(checks['aggregate-mappers']),
     check: aggregateMappers,
+  }),
+  'codec-pairs': plain({
+    name: 'codec-pairs',
+    description: 'Every exported encoder in a codec file has a decoder under the naming templates, and every decoder an encoder',
+    select: (checks) => enabledOptions(checks['codec-pairs']),
+    check: codecPairs,
   }),
   'command-types': plain({
     name: 'command-types',

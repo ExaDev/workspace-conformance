@@ -20,6 +20,7 @@ describe('conformanceSchema', () => {
     const config = {
       checks: {
         'aggregate-mappers': { contracts: ['a.ts'], mapper: '{dir}/{name}.ts', adapters: '{dir}/*', exclude: ['X'], tsConfig: 'tsconfig.json' },
+        'codec-pairs': { codecs: ['codecs.ts'], encoder: 'encode{name}', decoder: 'decode{name}', exclude: ['encodeLegacy'], tsConfig: 'tsconfig.json' },
         'command-types': { commands: ['c.ts'], exclude: ['Command'], inferences: ['infer'], tsConfig: 'tsconfig.json' },
         'derived-types': { pairs: [{ schemas: ['s.ts'], types: ['t.ts'] }], exclude: ['Union'], inferences: ['infer'], tsConfig: 'tsconfig.json' },
         'import-uphill': {},
@@ -83,6 +84,20 @@ describe('conformanceSchema', () => {
     expect(await issuesOf({ checks: { 'derived-types': { pairs: [{ schemas: ['s.ts'] }] } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'derived-types': { pairs: [{ schemas: [], types: ['t.ts'] }] } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'derived-types': { pairs: [{ schemas: ['s.ts'], types: ['t.ts'], extra: 1 }] } } })).toBeDefined();
+  });
+
+  it('rejects a codec-pairs name template without exactly one {name} and other text, or with another placeholder, without quoting it, and an encoder template equal to the decoder template', async () => {
+    const codecs = ['codecs.ts'];
+    const issue = 'checks.codec-pairs.encoder: needs {name} exactly once, other text beside it and no other placeholder';
+
+    expect(await issuesOf({ checks: { 'codec-pairs': { codecs, decoder: 'decode{name}' } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'codec-pairs': { codecs, encoder: 'encode', decoder: 'decode{name}' } } })).toEqual([issue]);
+    expect(await issuesOf({ checks: { 'codec-pairs': { codecs, encoder: '{name}', decoder: 'decode{name}' } } })).toEqual([issue]);
+    expect(await issuesOf({ checks: { 'codec-pairs': { codecs, encoder: 'encode{name}{name}', decoder: 'decode{name}' } } })).toEqual([issue]);
+    expect(await issuesOf({ checks: { 'codec-pairs': { codecs, encoder: 'encode{name}As{format}', decoder: 'decode{name}' } } })).toEqual([issue]);
+    expect(await issuesOf({ checks: { 'codec-pairs': { codecs, encoder: 'codec{name}', decoder: 'codec{name}' } } })).toEqual([
+      'checks.codec-pairs.decoder: the decoder template is the encoder template, so every name would be its own pair',
+    ]);
   });
 
   it('rejects a migrations-directory check without both tools, or with one that has no adapter', async () => {

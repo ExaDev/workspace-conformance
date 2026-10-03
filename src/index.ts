@@ -1,5 +1,6 @@
 export type { CheckContext, CheckFunction, GitHubCheckContext, GitHubCheckFunction, LayoutCheckContext, LayoutCheckFunction, SourceLocation, Violation } from './check';
 export { aggregateMappers } from './checks/aggregate-mappers';
+export { codecPairs } from './checks/codec-pairs';
 export { commandTypes, DEFAULT_INFERENCES } from './checks/command-types';
 export { commitTypes, PRESET_COMMIT_TYPES } from './checks/commit-types';
 export { DEFAULT_DERIVED_TYPE_INFERENCES, derivedTypes } from './checks/derived-types';
@@ -32,6 +33,7 @@ export type {
   AggregateMappersOptions,
   CheckName,
   CheckOptionsByName,
+  CodecPairsOptions,
   CommandTypesOptions,
   CommitTypesOptions,
   DerivedTypesOptions,

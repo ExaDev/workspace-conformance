@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ConformanceError } from '../errors';
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../../test/support/temp';
 import { aggregateMappers } from './aggregate-mappers';
+import { codecPairs } from './codec-pairs';
 import { commandTypes } from './command-types';
 
 const violating = fixturePath('type-graph', 'violating');
@@ -89,6 +90,117 @@ describe('aggregate-mappers', () => {
     await expect(commandTypes({ cwd: empty, options: { commands: ['a.ts'], tsConfig: 'SECRETTSCONFIG9.json' } })).rejects.toThrow(
       /^checks\.command-types\.tsConfig: the file does not exist$/u,
     );
+  });
+});
+
+describe('codec-pairs', () => {
+  const codecs = fixturePath('type-graph', 'codecs');
+  const codecOptions = { encoder: 'encode{name}', decoder: 'decode{name}' };
+
+  it('reports nothing for a complete pair, and ignores a value whose name fits neither template and an interface whose name fits one', async () => {
+    expect(await codecPairs({ cwd: codecs, options: { ...codecOptions, codecs: ['complete.ts'] } })).toEqual([]);
+  });
+
+  it('reports an encoder whose decoder the codec file does not export, where the encoder is declared', async () => {
+    const violations = await codecPairs({ cwd: codecs, options: { ...codecOptions, codecs: ['missing-decoder.ts'] } });
+
+    expect(violations).toEqual([
+      {
+        code: 'codec-pairs/missing-decoder',
+        message: 'encodeInvoice has no decoder: missing-decoder.ts does not export decodeInvoice',
+        file: 'missing-decoder.ts',
+        location: { line: 3, column: 17 },
+      },
+    ]);
+  });
+
+  it('reports a decoder whose encoder the codec file does not export, where the decoder is declared', async () => {
+    const violations = await codecPairs({ cwd: codecs, options: { ...codecOptions, codecs: ['missing-encoder.ts'] } });
+
+    expect(violations).toEqual([
+      {
+        code: 'codec-pairs/missing-encoder',
+        message: 'decodeReceipt has no encoder: missing-encoder.ts does not export encodeReceipt',
+        file: 'missing-encoder.ts',
+        location: { line: 3, column: 14 },
+      },
+    ]);
+  });
+
+  it('skips the names listed in exclude', async () => {
+    const options = { ...codecOptions, codecs: ['missing-decoder.ts', 'missing-encoder.ts'] };
+
+    expect((await codecPairs({ cwd: codecs, options })).map((violation) => violation.code)).toEqual(['codec-pairs/missing-decoder', 'codec-pairs/missing-encoder']);
+    expect(await codecPairs({ cwd: codecs, options: { ...options, exclude: ['encodeInvoice', 'decodeReceipt'] } })).toEqual([]);
+  });
+
+  it('takes the names from the templates, so a suffix works, and counts a class as a codec but not an interface', async () => {
+    const violations = await codecPairs({ cwd: codecs, options: { codecs: ['suffixed.ts'], encoder: '{name}Encoder', decoder: '{name}Decoder' } });
+
+    expect(violations.map((violation) => [violation.code, violation.message, violation.location])).toEqual([
+      ['codec-pairs/missing-decoder', 'PaymentEncoder has no decoder: suffixed.ts does not export PaymentDecoder', { line: 9, column: 14 }],
+    ]);
+  });
+
+  it('pairs names inside a namespace with names of the same namespace, and reports a re-exported half where it is declared', async () => {
+    const violations = await codecPairs({ cwd: codecs, options: { ...codecOptions, codecs: ['namespaced.ts'] } });
+
+    expect(violations).toEqual([
+      {
+        code: 'codec-pairs/missing-encoder',
+        message: 'Legacy.decodeReceipt has no encoder: namespaced.ts does not export Legacy.encodeReceipt',
+        file: 'missing-encoder.ts',
+        location: { line: 3, column: 14 },
+      },
+      {
+        code: 'codec-pairs/missing-decoder',
+        message: 'Wire.encodeRefund has no decoder: namespaced.ts does not export Wire.decodeRefund',
+        file: 'namespaced.ts',
+        location: { line: 10, column: 19 },
+      },
+    ]);
+  });
+
+  it('judges each codec file on its own exports, so a file that re-exports one half of a pair is reported, and does not walk a file that re-exports itself again', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'tsconfig.json': '{ "compilerOptions": { "strict": true } }',
+      'codec.ts': 'export const encodeA = (x: string): string => x;\nexport const decodeA = (x: string): string => x;\n',
+      'barrel.ts': "export { encodeA } from './codec';\nexport * as self from './barrel';\n",
+    });
+
+    const violations = await codecPairs({ cwd: workspace, options: { ...codecOptions, codecs: ['*.ts'] } });
+
+    expect(violations.map((violation) => [violation.message, violation.file])).toEqual([['encodeA has no decoder: barrel.ts does not export decodeA', 'codec.ts']]);
+  });
+
+  it('counts destructured constants, enums and values exported under another name', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'tsconfig.json': '{ "compilerOptions": { "strict": true } }',
+      'values.ts': [
+        'const codecs = { encodeA: (x: string): string => x, decodeA: (x: string): string => x };',
+        'export const { encodeA, decodeA } = codecs;',
+        'export enum encodeMode { Plain }',
+        'const local = (x: string): string => x;',
+        'export { local as encodeRenamed };',
+      ].join('\n'),
+    });
+
+    const violations = await codecPairs({ cwd: workspace, options: { ...codecOptions, codecs: ['values.ts'] } });
+
+    expect(violations.map((violation) => [violation.message, violation.location])).toEqual([
+      ['encodeMode has no decoder: values.ts does not export decodeMode', { line: 3, column: 13 }],
+      ['encodeRenamed has no decoder: values.ts does not export decodeRenamed', { line: 4, column: 7 }],
+    ]);
+  });
+
+  it('fails when no codec file matches, so a mistyped glob is not a pass', async () => {
+    await expect(codecPairs({ cwd: codecs, options: { ...codecOptions, codecs: ['nowhere/*.ts'] } })).rejects.toThrow(/^checks\.codec-pairs\.codecs: no file matches$/u);
+  });
+
+  it('fails on a name template the section would have rejected, naming the option', async () => {
+    await expect(codecPairs({ cwd: codecs, options: { ...codecOptions, codecs: ['complete.ts'], decoder: 'decode' } })).rejects.toThrow(/^checks\.codec-pairs\.decoder: needs \{name\} exactly once/u);
   });
 });
 

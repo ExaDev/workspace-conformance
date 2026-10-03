@@ -15,3 +15,31 @@ export function expandTemplate(template: string, values: Readonly<Record<string,
     return value;
   });
 }
+
+/**
+ * A name template split at its one `{name}`: the text before it and the text after it.
+ */
+export interface NameTemplate {
+  readonly before: string;
+  readonly after: string;
+}
+
+const NAME_PLACEHOLDER = '{name}';
+
+/**
+ * What a name template must be, as a configuration error says it. It does not quote the template, as no configuration error quotes a value.
+ */
+export const NAME_TEMPLATE_REQUIREMENT = 'needs {name} exactly once, other text beside it and no other placeholder';
+const ANY_PLACEHOLDER = /\{[a-z]+\}/u;
+
+/**
+ * `template` split at `{name}`, or `undefined` unless it holds `{name}` exactly once, other text beside it and no other placeholder. Without other text every name would match, and with `{name}` twice a name could be split more than one way.
+ */
+export function parseNameTemplate(template: string): NameTemplate | undefined {
+  const [before, after, ...rest] = template.split(NAME_PLACEHOLDER);
+  if (before === undefined || after === undefined || rest.length > 0 || before + after === '' || ANY_PLACEHOLDER.test(before + after)) {
+    return undefined;
+  }
+
+  return { before, after };
+}
