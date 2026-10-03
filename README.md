@@ -204,6 +204,10 @@ The default level lints nothing. For each sample it calls `calculateConfigForFil
 
 With `lint` the check also lints the workspace through `lintFiles` and maps every message to a violation at its position, or at the file alone when ESLint gives none, as for a parsing error that typescript-eslint's project service raises for a file outside every tsconfig. The code names the rule, `eslint/lint/<rule id>`, so `eslint/lint/no-console` and `eslint/lint/@scope/plugin/rule` are stable; a parsing error is `eslint/fatal` and a message with no rule, such as an unused disable directive, is `eslint/lint-message`. A pattern that matches no file, or only ignored files, is `eslint/nothing-linted`. Warnings are reported as well as errors, since a repository that fails its lint script on warnings (`--max-warnings 0`) is judged by what that script reports.
 
+A clean lint says little without how much was linted, so with `lint` the check adds a note to its result (`notes` of its entry in `runChecks`' `results`, a line on standard output on the command line): how many files it linted and, when `lintPatterns` leave some out, how many other files below the working directory ESLint has a configuration for (not ignored, and matched by a configuration block) that the patterns did not reach. That second number is ESLint's own answer for each file, not a threshold. It does not see files that the config itself leaves out: a root config that ignores `packages/**` because each package lints itself with its own config lints only the root's files, and the note then counts only those.
+
+Type-aware rules read the types of imports, so lint a workspace that is installed and built, as its own lint script does: an import of a workspace package whose declarations are not built resolves to nothing, its types are `any`, and every use of it is a `no-unsafe-*` finding that the built workspace does not have.
+
 Limits:
 
 - An external config is a black box. The check sees which rules are active on a file, not why, so it cannot tell a rule enabled by a shared preset from one written locally. Require the rules that matter and let the repository decide how it gets them.
@@ -284,7 +288,7 @@ Limits: classic branch protection and a merge queue's own merge method are not r
 workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings]
 ```
 
-`--cwd` is the directory that holds the config files (default: the current directory). `--check` runs only that check, which must be enabled, and may be repeated. `--list` prints every check and stops without reading any configuration. `--settings` also runs the enabled `settings-*` checks, which read the repository through the GitHub API with the token in `GITHUB_TOKEN` or `GH_TOKEN`; without it they are left out and the run is offline. Violations are printed to standard error as `file:line:column: code: message`.
+`--cwd` is the directory that holds the config files (default: the current directory). `--check` runs only that check, which must be enabled, and may be repeated. `--list` prints every check and stops without reading any configuration. `--settings` also runs the enabled `settings-*` checks, which read the repository through the GitHub API with the token in `GITHUB_TOKEN` or `GH_TOKEN`; without it they are left out and the run is offline. Violations are printed to standard error as `file:line:column: code: message` (`file: code: message` for one without a position), and a check's notes to standard output as `check: note`.
 
 | Exit status | Meaning |
 |---|---|
@@ -298,7 +302,7 @@ workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--
 import { runChecks } from 'workspace-conformance';
 
 const result = await runChecks({ cwd: process.cwd() });
-// result.results: one { check, violations } per check that ran
+// result.results: one { check, violations, notes } per check that ran
 // result.violations: all of them; result.exitCode: 0 or 1
 ```
 

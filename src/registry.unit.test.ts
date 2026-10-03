@@ -35,7 +35,7 @@ describe('registry', () => {
       throw new Error('settings-merge-methods has no run');
     }
 
-    await expect(settings.run({ cwd: '.', checks: { 'settings-merge-methods': {} }, layout: undefined, configFiles: undefined, github: undefined })).rejects.toThrow(/needs a GitHub client/u);
+    await expect(settings.run({ cwd: '.', checks: { 'settings-merge-methods': {} }, layout: undefined, configFiles: undefined, github: undefined, note: () => undefined })).rejects.toThrow(/needs a GitHub client/u);
   });
 
   it('treats a check as enabled when its setting is an options object, and not when it is false or absent', () => {
@@ -50,7 +50,7 @@ describe('registry', () => {
       throw new Error('single-storybook has no run');
     }
 
-    await expect(storybook.run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined, github: undefined })).rejects.toThrow(ConformanceError);
+    await expect(storybook.run({ cwd: '.', checks: {}, layout: undefined, configFiles: undefined, github: undefined, note: () => undefined })).rejects.toThrow(ConformanceError);
   });
 
   it('gives the import checks a place in the shared cruise and no run of their own', () => {

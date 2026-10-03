@@ -48,6 +48,15 @@ describe('runChecks with the sections supplied', () => {
     ]);
   });
 
+  it('returns what each check noted beside its violations', async () => {
+    const result = await runChecks({ cwd: fixturePath('eslint', 'lint'), config: { checks: { 'single-storybook': {}, eslint: { samples: ['src/clean.js'], lint: true, lintPatterns: ['src/clean.js'] } } } });
+
+    expect(result.results.map((entry) => [entry.check, entry.notes])).toEqual([
+      ['single-storybook', []],
+      ['eslint', ['linted 1 file; 3 other files have an ESLint configuration and were not reached by lintPatterns (src/clean.js)']],
+    ]);
+  });
+
   it('exits 0 when nothing is found', async () => {
     const result = await runChecks({ cwd: clean, config: importChecks, layout: importsLayout });
 

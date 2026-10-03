@@ -39,6 +39,10 @@ export interface CheckContext<Options> {
    * How config files that a check evaluates itself (the commitlint and release configs of `commit-types`) are loaded. Only `alias` and `fsCache` apply to evaluating a file; `trust` and the per-shape `unified` and `standalone` layer options are for `extends`. No transpile cache is written when omitted.
    */
   readonly configFiles?: ConfigFileOptions;
+  /**
+   * Receives what the check reports beside its violations: a line about what it did, such as how many files it linted, so a clean result can be told apart from one that looked at little. Nothing is reported when omitted.
+   */
+  readonly note?: (text: string) => void;
 }
 
 /**

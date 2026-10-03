@@ -48,6 +48,10 @@ export interface RunInput {
    * The client the settings checks read through; `undefined` when the run is offline.
    */
   readonly github: GitHubClient | undefined;
+  /**
+   * Receives the check's notes, what it reports beside its violations.
+   */
+  readonly note: (text: string) => void;
 }
 
 /**
@@ -111,13 +115,13 @@ function plain<Name extends CheckName, Options>(spec: {
     requiresLayout: false,
     requiresGitHub: false,
     isEnabled: (checks) => spec.select(checks) !== undefined,
-    run: async ({ cwd, checks, configFiles }) => {
+    run: async ({ cwd, checks, configFiles, note }) => {
       const options = spec.select(checks);
       if (options === undefined) {
         throw new ConformanceError(`the check '${spec.name}' is not enabled`);
       }
 
-      return spec.check({ cwd, options, ...(configFiles === undefined ? {} : { configFiles }) });
+      return spec.check({ cwd, options, note, ...(configFiles === undefined ? {} : { configFiles }) });
     },
   };
 }
@@ -134,7 +138,7 @@ function online<Name extends CheckName, Options>(spec: {
     requiresLayout: false,
     requiresGitHub: true,
     isEnabled: (checks) => spec.select(checks) !== undefined,
-    run: async ({ cwd, checks, configFiles, github }) => {
+    run: async ({ cwd, checks, configFiles, github, note }) => {
       const options = spec.select(checks);
       if (options === undefined) {
         throw new ConformanceError(`the check '${spec.name}' is not enabled`);
@@ -143,7 +147,7 @@ function online<Name extends CheckName, Options>(spec: {
         throw new ConformanceError(`the check '${spec.name}' reads the repository's settings and needs a GitHub client`);
       }
 
-      return spec.check({ cwd, options, github, ...(configFiles === undefined ? {} : { configFiles }) });
+      return spec.check({ cwd, options, github, note, ...(configFiles === undefined ? {} : { configFiles }) });
     },
   };
 }

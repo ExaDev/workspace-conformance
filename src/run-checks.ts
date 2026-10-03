@@ -52,6 +52,10 @@ export interface RunChecksOptions {
 export interface CheckResult {
   readonly check: CheckName;
   readonly violations: readonly Violation[];
+  /**
+   * What the check reported beside its violations, such as how many files it linted, in the order it reported them.
+   */
+  readonly notes: readonly string[];
 }
 
 /**
@@ -183,8 +187,12 @@ export async function runChecks(given: RunChecksOptions): Promise<RunResult> {
   const results: CheckResult[] = [];
   for (const name of names) {
     const check: RegisteredCheck<CheckName> = registry[name];
-    const violations = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles, github: options.github }) : readImported(imported, name);
-    results.push({ check: name, violations });
+    const notes: string[] = [];
+    const note = (text: string): void => {
+      notes.push(text);
+    };
+    const violations = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles, github: options.github, note }) : readImported(imported, name);
+    results.push({ check: name, violations, notes });
   }
   const violations = results.flatMap((result) => result.violations);
 
