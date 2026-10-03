@@ -1,3 +1,5 @@
+import { relative } from 'node:path';
+
 import { ConfigValidationError, type LayoutConfig } from '@exadev/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,6 +34,18 @@ describe('runChecks with the sections supplied', () => {
 
     await expect(runChecks({ cwd: clean, config: importChecks, layout: isolatingUndeclared })).rejects.toThrow(ConfigValidationError);
     await expect(runChecks({ cwd: clean, config: emptyContracts })).rejects.toThrow(ConfigValidationError);
+  });
+
+  it('resolves a relative working directory once, for every check alike', async () => {
+    const config: ConformanceConfig = { checks: { 'single-storybook': {}, eslint: { samples: ['src/index.js'], rules: { 'no-console': 'error' } } } };
+    const cwd = fixturePath('eslint', 'violating');
+
+    const fromRelative = await runChecks({ cwd: relative(process.cwd(), cwd), config });
+
+    expect(fromRelative).toEqual(await runChecks({ cwd, config }));
+    expect(fromRelative.results.find((entry) => entry.check === 'eslint')?.violations).toEqual([
+      { code: 'eslint/rule-too-weak', message: "the rule 'no-console' is 'warn' for src/index.js (required: error)", file: 'src/index.js' },
+    ]);
   });
 
   it('exits 0 when nothing is found', async () => {

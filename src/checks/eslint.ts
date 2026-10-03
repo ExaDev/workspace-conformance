@@ -185,7 +185,10 @@ async function lintViolations(cwd: string, eslint: ESLint, patterns: readonly st
  *
  * The config is a black box: the check sees which rules are active on a file, not why. It does not embed a config, so a repository without one is reported and nothing is substituted.
  */
-export const eslint: CheckFunction<EslintOptions> = async ({ cwd, options }) => {
+export const eslint: CheckFunction<EslintOptions> = async (context) => {
+  const { options } = context;
+  // ESLint's Node API takes only an absolute cwd, while every check accepts one relative to the process.
+  const cwd = resolve(context.cwd);
   const EslintClass = loadEslint(cwd);
   const instance = new EslintClass({ cwd, ...(options.configFile === undefined ? {} : { overrideConfigFile: resolve(cwd, options.configFile) }) });
   const shared = options.rules ?? {};

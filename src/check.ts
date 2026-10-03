@@ -31,7 +31,7 @@ export interface Violation {
  */
 export interface CheckContext<Options> {
   /**
-   * The directory the checks run in; every path option is relative to it.
+   * The directory the checks run in, absolute or relative to the working directory of the process; every path option is relative to it.
    */
   readonly cwd: string;
   readonly options: Options;
