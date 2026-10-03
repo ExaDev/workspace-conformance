@@ -35,6 +35,14 @@ describe('parseWorkflow', () => {
         ['id-token', 'write'],
       ]),
     });
+    expect(parseWorkflow(FILE, 'on: push\njobs: {}\n').permissionsLocation).toBeUndefined();
+    expect(parseWorkflow(FILE, 'on: push\npermissions: {}\njobs: {}\n').permissionsLocation).toEqual({ line: 2, column: 1 });
+  });
+
+  it('reads a job environment written as a name or as a mapping with a name', () => {
+    const environments = parseWorkflow(FILE, 'on: push\njobs:\n  a:\n    environment: release\n  b:\n    environment:\n      name: production\n      url: https://example.com\n  c:\n    runs-on: x\n').jobs.map((job) => job.environment);
+
+    expect(environments).toEqual(['release', 'production', undefined]);
   });
 
   it('reads jobs, steps and what they carry as text, with positions', () => {

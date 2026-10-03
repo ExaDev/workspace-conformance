@@ -2,9 +2,8 @@ import type { CheckFunction, Violation } from '../check';
 import type { WorkflowJobOrderingOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { type Job, transitiveNeeds, type Workflow } from '../workflows/model';
-import { callsAlways, DEFAULT_JUNCTION_JOBS, jobsNamed, stepUses, workflowViolation } from '../workflows/shared';
+import { callsAlways, DEFAULT_JUNCTION_JOBS, DEFAULT_RELEASE_JOBS, jobsNamed, stepUses, workflowViolation } from '../workflows/shared';
 
-const DEFAULT_RELEASE_JOBS: readonly string[] = ['release'];
 const DEFAULT_DEPLOY_JOBS: readonly string[] = ['deploy'];
 const DEFAULT_DOCS_DEPLOY_JOBS: readonly string[] = ['docs-deploy'];
 const DEFAULT_BRANCH = 'main';

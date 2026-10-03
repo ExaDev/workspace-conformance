@@ -7,7 +7,7 @@ import { isRecord } from '../config-files';
 import type { WorkflowCredentialsOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { accessOf, effectiveEnv, effectivePermissions, type Job, type Workflow } from '../workflows/model';
-import { scriptCommands, stepUses, workflowViolation } from '../workflows/shared';
+import { REGISTRY_TOKEN_VARIABLES, scriptCommands, stepUses, workflowViolation } from '../workflows/shared';
 
 /**
  * The actions that sign an attestation, which needs an OIDC identity and the right to store the attestation.
@@ -31,11 +31,6 @@ const PUBLISH_COMMAND = new RegExp(
   String.raw`^(?:(?:npm|pnpm|yarn)${PACKAGE_MANAGER_OPTIONS}(?:\s+npm)?\s+publish|(?:(?:pnpm|yarn)(?:\s+exec)?\s+|npx\s+)?(?:semantic-release|changeset\s+publish|lerna\s+publish))(?:\s|$)`,
   'u',
 );
-
-/**
- * The variables a token for the registry is passed in.
- */
-const TOKEN_VARIABLES: readonly string[] = ['NODE_AUTH_TOKEN', 'NPM_TOKEN'];
 
 const PROVENANCE_FLAG = /--provenance(?:=true)?(?:\s|$)/u;
 
@@ -72,7 +67,7 @@ function attestationViolations(workflow: Workflow, job: Job): readonly Violation
  * Whether the job passes a registry token to a step, which makes its publish not tokenless: a token variable with a value other than the empty string, anywhere in the environment.
  */
 function passesToken(workflow: Workflow, job: Job): boolean {
-  return [undefined, ...job.steps].some((step) => TOKEN_VARIABLES.some((variable) => (effectiveEnv(workflow, job, step)[variable] ?? '') !== ''));
+  return [undefined, ...job.steps].some((step) => REGISTRY_TOKEN_VARIABLES.some((variable) => (effectiveEnv(workflow, job, step)[variable] ?? '') !== ''));
 }
 
 function tokenlessPublishViolations(workflow: Workflow, job: Job, provenanceInManifest: boolean): readonly Violation[] {
@@ -86,7 +81,7 @@ function tokenlessPublishViolations(workflow: Workflow, job: Job, provenanceInMa
       return [];
     }
     const env = effectiveEnv(workflow, job, step);
-    const blanked = TOKEN_VARIABLES.every((variable) => env[variable] === '');
+    const blanked = REGISTRY_TOKEN_VARIABLES.every((variable) => env[variable] === '');
     const provenance = provenanceInManifest || publishes.some((line) => PROVENANCE_FLAG.test(line)) || env['NPM_CONFIG_PROVENANCE'] === 'true';
 
     return blanked || provenance
@@ -95,7 +90,7 @@ function tokenlessPublishViolations(workflow: Workflow, job: Job, provenanceInMa
           workflowViolation(
             workflow,
             'workflow-credentials/tokenless-publish-unprotected',
-            `job '${job.id}' publishes with an OIDC identity and no token, but does not set ${TOKEN_VARIABLES.join(' and ')} to the empty string, so a token inherited from the environment is used when the OIDC exchange fails; set them to the empty string to prevent that, or request provenance so that such a publish at least carries a traceable attestation`,
+            `job '${job.id}' publishes with an OIDC identity and no token, but does not set ${REGISTRY_TOKEN_VARIABLES.join(' and ')} to the empty string, so a token inherited from the environment is used when the OIDC exchange fails; set them to the empty string to prevent that, or request provenance so that such a publish at least carries a traceable attestation`,
             step.location,
           ),
         ];

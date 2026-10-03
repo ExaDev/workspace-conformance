@@ -337,6 +337,16 @@ export type WorkflowVersionSingleSourceOptions = WorkflowSelection;
 export type WorkflowCredentialsOptions = WorkflowSelection;
 
 /**
+ * Options of the `workflow-release-job` check: the job that publishes is the only one that can mint the OIDC identity, runs in an environment and leaves no credentials behind.
+ */
+export interface WorkflowReleaseJobOptions extends WorkflowSelection {
+  /**
+   * Ids of release jobs: the jobs that publish, and the only ones that may hold `id-token: write`. `release` when omitted.
+   */
+  readonly releaseJobs?: readonly string[];
+}
+
+/**
  * Options of the `workflow-repository-dispatch` check: what a handler of `repository_dispatch` may do.
  */
 export interface WorkflowRepositoryDispatchOptions extends WorkflowSelection {
@@ -459,6 +469,7 @@ export interface CheckOptionsByName {
   readonly 'workflow-runner-resolution': WorkflowRunnerResolutionOptions;
   readonly 'workflow-version-single-source': WorkflowVersionSingleSourceOptions;
   readonly 'workflow-credentials': WorkflowCredentialsOptions;
+  readonly 'workflow-release-job': WorkflowReleaseJobOptions;
   readonly 'workflow-repository-dispatch': WorkflowRepositoryDispatchOptions;
   readonly 'workflow-update-bot-cooldown': WorkflowUpdateBotCooldownOptions;
   readonly 'workflow-merge-group': WorkflowMergeGroupOptions;

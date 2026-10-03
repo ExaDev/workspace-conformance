@@ -21,6 +21,7 @@ export { workflowActionPinning } from './checks/workflow-action-pinning';
 export { workflowCredentials } from './checks/workflow-credentials';
 export { workflowJobOrdering } from './checks/workflow-job-ordering';
 export { workflowMergeGroup } from './checks/workflow-merge-group';
+export { workflowReleaseJob } from './checks/workflow-release-job';
 export { workflowRepositoryDispatch } from './checks/workflow-repository-dispatch';
 export { workflowRunnerResolution } from './checks/workflow-runner-resolution';
 export { workflowSkippableJobs } from './checks/workflow-skippable-jobs';
@@ -55,6 +56,7 @@ export type {
   WorkflowCredentialsOptions,
   WorkflowJobOrderingOptions,
   WorkflowMergeGroupOptions,
+  WorkflowReleaseJobOptions,
   WorkflowRepositoryDispatchOptions,
   WorkflowRunnerResolutionOptions,
   WorkflowSkippableJobsOptions,

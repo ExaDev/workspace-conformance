@@ -65,6 +65,10 @@ export interface Job {
   readonly needs: readonly string[];
   readonly condition: string | undefined;
   readonly permissions: Permissions;
+  /**
+   * The name of the deployment environment the job runs in, written as `environment: <name>` or `environment: { name: <name> }`; `undefined` when it names none.
+   */
+  readonly environment: string | undefined;
   readonly env: Readonly<Record<string, string>>;
   readonly runsOn: RunsOn;
   readonly timeoutMinutes: string | undefined;
@@ -93,6 +97,10 @@ export interface Workflow {
    */
   readonly triggerLocations: ReadonlyMap<string, SourceLocation>;
   readonly permissions: Permissions;
+  /**
+   * Where the workflow's `permissions` is written; `undefined` when it declares none.
+   */
+  readonly permissionsLocation: SourceLocation | undefined;
   readonly env: Readonly<Record<string, string>>;
   readonly jobs: readonly Job[];
   /**
@@ -239,6 +247,10 @@ function runsOnOf(reader: Reader, value: unknown, what: string): RunsOn {
   return { labels: entries.filter((entry) => !entry.includes('${{')), expressions: entries.filter((entry) => entry.includes('${{')), group };
 }
 
+function environmentOf(reader: Reader, value: unknown, what: string): string | undefined {
+  return isRecord(value) ? reader.text(value['name'], `${what}.name`) : reader.text(value, what);
+}
+
 function stepOf(reader: Reader, value: unknown, jobPath: readonly (string | number)[], index: number): Step {
   const path = [...jobPath, 'steps', index];
   const what = path.join('.');
@@ -272,6 +284,7 @@ function jobOf(reader: Reader, id: string, value: unknown): Job {
     needs: reader.list(job['needs'], `${what}.needs`),
     condition: reader.text(job['if'], `${what}.if`),
     permissions: permissionsOf(reader, job['permissions'], `${what}.permissions`),
+    environment: environmentOf(reader, job['environment'], `${what}.environment`),
     env: reader.texts(job['env'], `${what}.env`),
     runsOn: runsOnOf(reader, job['runs-on'], `${what}.runs-on`),
     timeoutMinutes: reader.text(job['timeout-minutes'], `${what}.timeout-minutes`),
@@ -317,6 +330,7 @@ export function parseWorkflow(file: string, source: string): Workflow {
     triggers,
     triggerLocations: triggerLocationsOf(reader, triggers, root['on']),
     permissions: permissionsOf(reader, root['permissions'], 'permissions'),
+    permissionsLocation: root['permissions'] === undefined ? undefined : reader.location(['permissions']),
     env: reader.texts(root['env'], 'env'),
     jobs: Object.entries(reader.record(root['jobs'], 'jobs')).map(([id, job]) => jobOf(reader, id, job)),
     callOutputs: Object.fromEntries(Object.entries(outputs).map(([name, output]) => [name, reader.text(reader.record(output, `on.workflow_call.outputs.${name}`)['value'], `on.workflow_call.outputs.${name}.value`) ?? ''])),
