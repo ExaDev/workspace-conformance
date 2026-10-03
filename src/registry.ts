@@ -7,6 +7,7 @@ import { commandTypes } from './checks/command-types';
 import { commitTypes } from './checks/commit-types';
 import { derivedTypes } from './checks/derived-types';
 import { dockerfilePackageManager } from './checks/dockerfile-package-manager';
+import { enginesFloor } from './checks/engines-floor';
 import { settingsMergeMethods } from './checks/settings-merge-methods';
 import { settingsRequiredChecks } from './checks/settings-required-checks';
 import { settingsReviewThreadResolution } from './checks/settings-review-thread-resolution';
@@ -238,6 +239,12 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: 'The commit types commitlint accepts match the release rules and changelog sections',
     select: (checks) => enabledOptions(checks['commit-types']),
     check: commitTypes,
+  }),
+  'engines-floor': plain({
+    name: 'engines-floor',
+    description: "A package's engines.node range admits no Node version that one of its installed dependencies rejects",
+    select: (checks) => enabledOptions(checks['engines-floor']),
+    check: enginesFloor,
   }),
   'dockerfile-package-manager': plain({
     name: 'dockerfile-package-manager',

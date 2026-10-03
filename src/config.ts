@@ -108,6 +108,7 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
   ),
   'single-storybook': z.exactOptional(enabled(z.strictObject({ location: z.exactOptional(path), exclude: z.exactOptional(paths) }))),
   'commit-types': z.exactOptional(enabled(z.strictObject({ commitlint: z.exactOptional(path), release: z.exactOptional(path) }))),
+  'engines-floor': z.exactOptional(enabled(z.strictObject({ packages: z.exactOptional(paths) }))),
   'dockerfile-package-manager': z.exactOptional(enabled(z.strictObject({ dockerfiles: z.exactOptional(paths), exclude: z.exactOptional(paths), packageJson: z.exactOptional(path) }))),
   eslint: z.exactOptional(
     enabled(

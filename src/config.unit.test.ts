@@ -29,6 +29,7 @@ describe('conformanceSchema', () => {
         'instruction-symlinks': { files: ['AGENTS.md'], directories: ['.'], target: 'README.md' },
         'single-storybook': { location: '.', exclude: ['test/fixtures/**'] },
         'commit-types': { commitlint: 'c.ts', release: 'r.ts' },
+        'engines-floor': { packages: ['.', 'packages/*', '!packages/private'] },
         'dockerfile-package-manager': { dockerfiles: ['Dockerfile'], exclude: ['test/fixtures/**'], packageJson: 'package.json' },
         'workflow-job-ordering': { workflows: ['.github/workflows/ci.yml'], exclude: ['x'], releaseJobs: ['release'], deployJobs: ['deploy'], docsDeployJobs: ['docs'], junctionJobs: ['gate'], junctionExempt: ['nightly'], defaultBranch: 'main' },
         'workflow-skippable-jobs': { junctionJobs: ['gate'], pathFilterActions: ['dorny/paths-filter'] },
