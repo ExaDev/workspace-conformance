@@ -112,6 +112,19 @@ describe('eslint', () => {
     ]);
   });
 
+  it('reports a parsing error that names no position at the file, with no location', async () => {
+    const cwd = await emptyWorkspaceWithEslint();
+    await writeFiles(cwd, {
+      // A parser that fails the way typescript-eslint's project service does for a file outside every tsconfig: an error with a message and no position.
+      'eslint.config.mjs': "export default [{ files: ['**/*.js'], languageOptions: { parser: { parseForESLint() { throw new Error('not found by the project service'); } } } }];\n",
+      'src/index.js': 'export {};\n',
+    });
+
+    expect(await eslint({ cwd, options: { samples: [], lint: true, lintPatterns: ['src'] } })).toEqual([
+      { code: 'eslint/fatal', message: 'Parsing error: not found by the project service', file: 'src/index.js' },
+    ]);
+  });
+
   it('fails when ESLint does not resolve from the directory the checks run in', async () => {
     const cwd = await copyFixture('eslint', 'clean');
 

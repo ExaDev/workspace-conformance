@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 
 import type { ESLint } from 'eslint';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, SourceLocation, Violation } from '../check';
 import { isRecord } from '../config-files';
 import { ConformanceError } from '../errors';
 import type { EslintOptions, EslintRequiredSeverity, EslintSample } from '../options';
@@ -128,18 +128,29 @@ function isNothingLinted(error: unknown): error is Error {
   return error instanceof Error && isRecord(error) && (error['messageTemplate'] === 'file-not-found' || error['messageTemplate'] === 'all-matched-files-ignored');
 }
 
-function messageViolation(cwd: string, result: ESLint.LintResult, message: ESLint.LintResult['messages'][number]): Violation {
+type LintMessage = ESLint.LintResult['messages'][number];
+
+/**
+ * Where a message is, or `undefined` for a message about the whole file. ESLint types `line` and `column` as numbers, but a parsing error copies them from the parser's error, which may carry none: typescript-eslint's project service reports a file outside every tsconfig that way.
+ */
+function locationOf(message: LintMessage): SourceLocation | undefined {
+  const line: unknown = message.line;
+  const column: unknown = message.column;
+
+  return typeof line === 'number' && typeof column === 'number' ? { line, column } : undefined;
+}
+
+function messageViolation(cwd: string, result: ESLint.LintResult, message: LintMessage): Violation {
   const file = relativePosix(cwd, result.filePath);
-  const location = { line: message.line, column: message.column };
+  const location = locationOf(message);
+  const at = location === undefined ? { file } : { file, location };
   if (message.ruleId !== null) {
     const severity = message.severity === 1 ? 'warn' : 'error';
 
-    return { code: `eslint/lint/${message.ruleId}`, message: `${message.ruleId} (${severity}): ${message.message}`, file, location };
+    return { code: `eslint/lint/${message.ruleId}`, message: `${message.ruleId} (${severity}): ${message.message}`, ...at };
   }
 
-  return message.fatal === true
-    ? { code: 'eslint/fatal', message: message.message, file, location }
-    : { code: 'eslint/lint-message', message: message.message, file, location };
+  return message.fatal === true ? { code: 'eslint/fatal', message: message.message, ...at } : { code: 'eslint/lint-message', message: message.message, ...at };
 }
 
 function byPosition(left: Violation, right: Violation): number {
