@@ -62,9 +62,9 @@ The tool reads two sections through `@exadev/config`, each from `exadev.config.t
 
 ### How the layout maps to packages
 
-Packages are the directories that the `packages` globs select and that hold a `package.json`. Each belongs to the group whose root is the longest prefix of its directory, and takes its rank from the first matching `nameRanks` pattern, else its group's `rank`, else `defaultRank`. A `segment` slice is the path segment below the group root; a `namePrefix` slice is the longest slice value produced by a `segment` group that prefixes the package's unscoped name. These are the same rules the ESLint architecture rules apply.
+Packages are the directories that the `packages` globs select and that hold a `package.json`. The root package is one when a glob selects it (`.`), which is how a single-package repository is described: `packages: ['.']` with a group whose `path` is `.`, so `import-cycles` judges the files of the one package. Since every other package directory is inside the root, the root package cannot be a package beside others. Each belongs to the group whose root is the longest prefix of its directory, and takes its rank from the first matching `nameRanks` pattern, else its group's `rank`, else `defaultRank`. A `segment` slice is the path segment below the group root; a `namePrefix` slice is the longest slice value produced by a `segment` group that prefixes the package's unscoped name. These are the same rules the ESLint architecture rules apply.
 
-The tool fails loudly, with a configuration error, on what it cannot judge: a package directory no group owns, package directories nested inside one another, a rank check when some package resolves no rank, and a check that needs `rankSkip`, `isolatedGroups` or a slice when the layout has none.
+The tool fails loudly, with a configuration error, on what it cannot judge: globs that select no package, a package directory no group owns, package directories nested inside one another, a rank check when some package resolves no rank, and a check that needs `rankSkip`, `isolatedGroups` or a slice when the layout has none.
 
 ## Checks
 

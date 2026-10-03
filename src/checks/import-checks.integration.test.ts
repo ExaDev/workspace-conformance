@@ -290,3 +290,43 @@ describe('a layout root other than the working directory', () => {
     expect(summary(violations)).toEqual([['import-uphill/higher-rank', 'violating/core/kernel/src/index.ts']]);
   });
 });
+
+describe('a single-package repository', () => {
+  const layout = { groups: [{ name: 'root', path: '.', rank: 0 }], packages: ['.'] };
+
+  it('finds a cycle among the files of the root package', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'package.json': '{ "name": "single" }',
+      'src/a.ts': "import './b';\nexport const a = 1;\n",
+      'src/b.ts': "import './a';\nexport const b = 1;\n",
+    });
+
+    const violations = await importCycles({ cwd: workspace, layout, options: {} });
+
+    expect(violations).toEqual([{ code: 'import-cycles/cycle', message: 'import cycle: src/a.ts -> src/b.ts -> src/a.ts', file: 'src/a.ts' }]);
+  });
+
+  it('reports nothing for a root package without a cycle', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'package.json': '{ "name": "single" }',
+      'src/a.ts': "import './b';\nexport const a = 1;\n",
+      'src/b.ts': 'export const b = 1;\n',
+    });
+
+    expect(await importCycles({ cwd: workspace, layout, options: {} })).toEqual([]);
+  });
+
+  it('fails instead of reporting no cycle when the patterns select no package', async () => {
+    const workspace = await makeTempDir();
+    await writeFiles(workspace, {
+      'package.json': '{ "name": "single" }',
+      'pnpm-workspace.yaml': 'packages: []\n',
+      'src/a.ts': "import './b';\n",
+      'src/b.ts': "import './a';\n",
+    });
+
+    await expect(importCycles({ cwd: workspace, layout: { groups: [{ name: 'root', path: '.' }] }, options: {} })).rejects.toThrow(ConformanceError);
+  });
+});

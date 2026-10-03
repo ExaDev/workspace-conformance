@@ -29,7 +29,7 @@ describe('discoverPackages', () => {
     expect(found.map((member) => member.dir)).toEqual(['core/kernel']);
   });
 
-  it('leaves out the root package and installed dependencies', async () => {
+  it('finds the root package as the directory . when a pattern selects it, and leaves out installed dependencies', async () => {
     const root = await makeTempDir();
     await writeFiles(root, {
       'package.json': '{ "name": "root" }',
@@ -39,7 +39,17 @@ describe('discoverPackages', () => {
 
     const found = await discoverPackages(root, ['.', 'a', '**']);
 
-    expect(found.map((member) => member.dir)).toEqual(['a']);
+    expect(found).toEqual([
+      { dir: '.', name: 'root' },
+      { dir: 'a', name: 'a' },
+    ]);
+  });
+
+  it('leaves out the root package when no pattern selects it', async () => {
+    const root = await makeTempDir();
+    await writeFiles(root, { 'package.json': '{ "name": "root" }', 'a/package.json': '{ "name": "a" }' });
+
+    expect((await discoverPackages(root, ['a'])).map((member) => member.dir)).toEqual(['a']);
   });
 
   it('fails naming the manifest that is not valid JSON', async () => {
@@ -95,6 +105,25 @@ describe('workspaceRoot', () => {
 });
 
 describe('readWorkspacePackages', () => {
+  it('reads a single-package repository whose root package the patterns select', async () => {
+    const root = await makeTempDir();
+    await writeFiles(root, { 'package.json': '{ "name": "single" }' });
+
+    const packages = await readWorkspacePackages(root, { groups: [{ name: 'root', path: '.', rank: 0 }], packages: ['.'] });
+
+    expect(packages).toEqual([{ dir: '.', name: 'single', group: 'root', rank: 0, slice: undefined }]);
+  });
+
+  it('fails when the patterns select no package, instead of checking nothing', async () => {
+    const root = await makeTempDir();
+    await writeFiles(root, { 'package.json': '{ "name": "single" }', 'pnpm-workspace.yaml': 'packages: []\n' });
+
+    await expect(readWorkspacePackages(root, { groups: [{ name: 'root', path: '.' }] })).rejects.toThrow(ConformanceError);
+    await expect(readWorkspacePackages(root, { groups: [{ name: 'root', path: '.' }], packages: ['packages/*'] })).rejects.toThrow(
+      "no workspace package found: no directory the patterns packages/* select holds a package.json; for a single-package repository, set the layout's packages to ['.']",
+    );
+  });
+
   it('classifies the packages the workspace file selects', async () => {
     const packages = await readWorkspacePackages(clean, importsLayout);
 

@@ -14,7 +14,7 @@ import { INSTALLED_DEPENDENCIES_GLOB } from '../files';
  */
 export interface DiscoveredPackage {
   /**
-   * Relative to the workspace root, with `/` separators.
+   * Relative to the workspace root, with `/` separators; {@link ROOT_PACKAGE_DIR} for the package at the root.
    */
   readonly dir: string;
   /**
@@ -39,6 +39,25 @@ export interface WorkspacePackage extends DiscoveredPackage {
    * The slice the group's `slice` rule derives; `undefined` for a group without one and for a package that yields none.
    */
   readonly slice: string | undefined;
+}
+
+/**
+ * The directory of the package at the workspace root, as {@link DiscoveredPackage}`.dir` names it.
+ */
+export const ROOT_PACKAGE_DIR = '.';
+
+/**
+ * What every path inside the package in `dir` starts with, relative to the workspace root: `dir` and a `/`, or nothing for the root package, which holds every path. The trailing `/` keeps `packages/a` from holding `packages/ab`.
+ */
+export function packagePathPrefix(dir: string): string {
+  return dir === ROOT_PACKAGE_DIR ? '' : `${dir}/`;
+}
+
+/**
+ * Whether `path`, relative to the workspace root, is inside the package in `dir`.
+ */
+export function isInPackage(dir: string, path: string): boolean {
+  return path.startsWith(packagePathPrefix(dir));
 }
 
 function segmentsOf(path: string): readonly string[] {
@@ -102,7 +121,7 @@ function sliceByNamePrefix(name: string, known: ReadonlySet<string>): string | u
 /**
  * Classify discovered packages by the layout: group, rank and slice. Pure.
  *
- * A package no group owns is a configuration error, because every check would otherwise skip it without saying so. Nested package directories are one too: the checks attribute a file to the package whose directory is its prefix, which is ambiguous for a package inside another. A `namePrefix` slice takes the longest slice value that a `segment` group produced and that prefixes the package's unscoped name; a package without a name has no such slice.
+ * A package no group owns is a configuration error, because every check would otherwise skip it without saying so. Nested package directories are one too: the checks attribute a file to the package whose directory is its prefix, which is ambiguous for a package inside another. The root package holds every other directory, so it is a package only in a single-package repository. A `namePrefix` slice takes the longest slice value that a `segment` group produced and that prefixes the package's unscoped name; a package without a name has no such slice.
  */
 export function classifyPackages(discovered: readonly DiscoveredPackage[], layout: LayoutConfig): readonly WorkspacePackage[] {
   const owned = discovered.map((found) => {
@@ -136,7 +155,7 @@ export function classifyPackages(discovered: readonly DiscoveredPackage[], layou
   });
 
   for (const outer of packages) {
-    const nested = packages.find((inner) => inner.dir !== outer.dir && inner.dir.startsWith(`${outer.dir}/`));
+    const nested = packages.find((inner) => inner.dir !== outer.dir && isInPackage(outer.dir, inner.dir));
     if (nested !== undefined) {
       throw new ConformanceError(`the package directory '${nested.dir}' is inside the package directory '${outer.dir}'; workspace packages must not nest`);
     }
@@ -210,12 +229,16 @@ async function readName(manifest: string): Promise<string | undefined> {
 }
 
 /**
- * The directories under `root` that the pnpm-style `patterns` select and that hold a `package.json`, sorted. A `!` pattern excludes. The root package itself (`.`) is not a member of any group and is left out.
+ * The directories under `root` that the pnpm-style `patterns` select and that hold a `package.json`, sorted. A `!` pattern excludes. The root package is found, as {@link ROOT_PACKAGE_DIR}, when a pattern selects it (`.`, or `**`).
  */
 export async function discoverPackages(root: string, patterns: readonly string[]): Promise<readonly DiscoveredPackage[]> {
   const manifests = patterns.map((pattern) => (pattern.startsWith('!') ? `!${pattern.slice(1)}/**` : `${pattern}/package.json`));
   const found = await glob(manifests, { cwd: root, dot: true, ignore: [INSTALLED_DEPENDENCIES_GLOB], onlyFiles: true });
-  const dirs = found.map((manifest) => manifest.replace(/\/?package\.json$/u, '')).filter((dir) => dir !== '');
+  const dirs = found.map((manifest) => {
+    const dir = manifest.replace(/\/?package\.json$/u, '');
+
+    return dir === '' ? ROOT_PACKAGE_DIR : dir;
+  });
 
   return Promise.all(
     [...new Set(dirs)].sort().map(async (dir) => ({ dir, name: await readName(join(root, dir, 'package.json')) })),
@@ -223,10 +246,16 @@ export async function discoverPackages(root: string, patterns: readonly string[]
 }
 
 /**
- * The layout's packages found under the workspace root.
+ * The layout's packages found under the workspace root. Finding none is a configuration error: every check that reads the packages would otherwise look at nothing and report a clean workspace.
  */
 export async function readWorkspacePackages(cwd: string, layout: LayoutConfig): Promise<readonly WorkspacePackage[]> {
   const root = workspaceRoot(cwd, layout);
+  const patterns = await workspacePatterns(root, layout);
+  const discovered = await discoverPackages(root, patterns);
+  if (discovered.length === 0) {
+    const selection = patterns.length === 0 ? 'the package patterns are empty, so no directory is selected' : `no directory the patterns ${patterns.join(', ')} select holds a package.json`;
+    throw new ConformanceError(`no workspace package found: ${selection}; for a single-package repository, set the layout's packages to ['.']`);
+  }
 
-  return classifyPackages(await discoverPackages(root, await workspacePatterns(root, layout)), layout);
+  return classifyPackages(discovered, layout);
 }
