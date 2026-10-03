@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ConformanceError } from './errors';
-import { createGitHubClient } from './github';
+import { createGitHubClient, RulesetsUnavailableError } from './github';
 
 interface Call {
   readonly url: string;
@@ -9,12 +9,27 @@ interface Call {
 }
 
 /**
- * A `fetch` that answers each request with the next of `responses` (a status number refuses the request with it) and records what was asked.
+ * A refusal: the status, its text and the body GitHub sends with it.
+ */
+class Refusal {
+  public constructor(
+    public readonly status: number,
+    public readonly statusText: string,
+    public readonly body: unknown,
+  ) {}
+}
+
+/**
+ * A `fetch` that answers each request with the next of `responses` (a status number refuses the request with it and an empty object, a {@link Refusal} with its own text and body) and records what was asked.
  */
 function fakeFetch(responses: readonly unknown[]): { readonly fetch: typeof fetch; readonly calls: () => readonly Call[] } {
   const mock = vi.fn<typeof fetch>();
   for (const response of responses) {
-    mock.mockResolvedValueOnce(typeof response === 'number' ? new Response('{}', { status: response, statusText: 'Nope' }) : Response.json(response));
+    if (response instanceof Refusal) {
+      mock.mockResolvedValueOnce(Response.json(response.body, { status: response.status, statusText: response.statusText }));
+    } else {
+      mock.mockResolvedValueOnce(typeof response === 'number' ? new Response('{}', { status: response, statusText: 'Nope' }) : Response.json(response));
+    }
   }
 
   return {
@@ -24,6 +39,10 @@ function fakeFetch(responses: readonly unknown[]): { readonly fetch: typeof fetc
 }
 
 const NOT_FOUND = 404;
+const FORBIDDEN = 403;
+// The bodies GitHub sends with a 403, as `gh api repos/<owner>/<private repository>/rules/branches/main` returns it for a private repository on a plan without rulesets, and as the REST troubleshooting guide words a token without the permission.
+const PLAN_LIMIT = { message: 'Upgrade to GitHub Pro or make this repository public to enable this feature.', documentation_url: 'https://docs.github.com/rest/repos/rules#get-rules-for-a-branch', status: '403' };
+const NO_PERMISSION = { message: 'Resource not accessible by personal access token', documentation_url: 'https://docs.github.com/rest/repos/rules#get-rules-for-a-branch', status: '403' };
 const SLUG = { owner: 'example-org', name: 'example-repo' };
 
 describe('createGitHubClient', () => {
@@ -87,6 +106,34 @@ describe('createGitHubClient', () => {
     const client = createGitHubClient({ token: 't', fetch: fake });
 
     await expect(client.repository(SLUG)).rejects.toThrow(new ConformanceError('GET /repos/example-org/example-repo failed: 404 Nope'));
+  });
+
+  it("names GitHub's own message when it refuses a request", async () => {
+    const { fetch: fake } = fakeFetch([new Refusal(FORBIDDEN, 'Forbidden', NO_PERMISSION)]);
+    const client = createGitHubClient({ token: 't', fetch: fake });
+
+    await expect(client.repository(SLUG)).rejects.toThrow(new ConformanceError('GET /repos/example-org/example-repo failed: 403 Forbidden: Resource not accessible by personal access token'));
+  });
+
+  it('rejects with RulesetsUnavailableError, carrying the message, when the plan of the repository has no rulesets', async () => {
+    const { fetch: fake } = fakeFetch([new Refusal(FORBIDDEN, 'Forbidden', PLAN_LIMIT)]);
+    const client = createGitHubClient({ token: 't', fetch: fake });
+
+    const refused = client.branchRules(SLUG, 'main');
+
+    await expect(refused).rejects.toThrow(RulesetsUnavailableError);
+    await expect(refused).rejects.toThrow(PLAN_LIMIT.message);
+  });
+
+  it('keeps a 403 for a missing permission an ordinary error, not an unavailable feature', async () => {
+    const { fetch: fake } = fakeFetch([new Refusal(FORBIDDEN, 'Forbidden', NO_PERMISSION)]);
+    const client = createGitHubClient({ token: 't', fetch: fake });
+
+    const refused = client.branchRules(SLUG, 'main').catch((error: unknown) => error);
+
+    expect(await refused).toBeInstanceOf(ConformanceError);
+    expect(await refused).not.toBeInstanceOf(RulesetsUnavailableError);
+    expect(String(await refused)).toContain(NO_PERMISSION.message);
   });
 
   it('fails on a response that is not the shape it reads', async () => {

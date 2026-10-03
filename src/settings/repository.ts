@@ -1,7 +1,6 @@
 import { ConformanceError } from '../errors';
-import type { RepositorySlug } from '../github';
 import { remoteUrl } from '../git';
-import type { GitHubClient } from '../github';
+import { type BranchRules, type GitHubClient, type RepositorySlug, RulesetsUnavailableError } from '../github';
 import type { SettingsOptions } from '../options';
 
 const SLUG = /^([^/\s]+)\/([^/\s]+)$/u;
@@ -41,4 +40,26 @@ export async function branchOf(github: GitHubClient, slug: RepositorySlug, optio
  */
 export function repositoryFile(slug: RepositorySlug): string {
   return `${slug.owner}/${slug.name}`;
+}
+
+/**
+ * The rules of the branch, or GitHub's message when the repository's plan has no rulesets, in which case no rule applies to the branch and none can be added. Any other refusal rejects.
+ */
+export async function branchRulesOf(github: GitHubClient, slug: RepositorySlug, options: SettingsOptions): Promise<{ readonly rules: BranchRules } | { readonly unavailable: string }> {
+  const branch = await branchOf(github, slug, options);
+  try {
+    return { rules: await github.branchRules(slug, branch) };
+  } catch (error) {
+    if (error instanceof RulesetsUnavailableError) {
+      return { unavailable: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * The message of a `rules-unavailable` violation: the branch rules of the repository cannot be read or enforced on its plan, so `what` cannot be required.
+ */
+export function rulesUnavailableMessage(file: string, what: string, githubMessage: string): string {
+  return `the branch rules of ${file} cannot be read or enforced on its plan, so ${what} cannot be required (GitHub: ${githubMessage})`;
 }

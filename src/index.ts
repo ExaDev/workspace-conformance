@@ -30,7 +30,7 @@ export { workflowUpdateBotCooldown } from './checks/workflow-update-bot-cooldown
 export { workflowVersionSingleSource } from './checks/workflow-version-single-source';
 export { type ChecksConfig, type ConformanceConfig, conformanceSchema, conformanceSection } from './config';
 export { ConformanceError } from './errors';
-export { type BranchRules, createGitHubClient, type GitHubClient, type GitHubClientOptions, type RepositorySettings, type RepositorySlug } from './github';
+export { type BranchRules, createGitHubClient, type GitHubClient, type GitHubClientOptions, type RepositorySettings, type RepositorySlug, RulesetsUnavailableError } from './github';
 export type {
   AggregateMappersOptions,
   CheckName,
