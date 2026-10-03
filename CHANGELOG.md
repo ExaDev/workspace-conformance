@@ -1,3 +1,5 @@
+## [4.0.1](https://github.com/ExaDev/workspace-conformance/compare/v4.0.0...v4.0.1) (2026-10-03)
+
 # [4.0.0](https://github.com/ExaDev/workspace-conformance/compare/v3.0.0...v4.0.0) (2026-10-03)
 
 
