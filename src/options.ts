@@ -28,6 +28,32 @@ export interface AggregateMappersOptions {
 }
 
 /**
+ * Options of the `codec-pairs` check: every encoder a codec file exports has a decoder it also exports, and every decoder an encoder.
+ */
+export interface CodecPairsOptions {
+  /**
+   * Globs of the codec files, relative to the directory the checks run in. Each file is judged on its own exports, re-exports included.
+   */
+  readonly codecs: readonly string[];
+  /**
+   * The name of an encoder, with `{name}` standing for the name it shares with its decoder, such as `encode{name}` or `{name}Encoder`. `{name}` appears exactly once, beside other text, and is the only placeholder.
+   */
+  readonly encoder: string;
+  /**
+   * The name of a decoder, in the same form as `encoder` and different from it.
+   */
+  readonly decoder: string;
+  /**
+   * Names of exported encoders and decoders that need no counterpart, such as an encoder for a format that is only ever written.
+   */
+  readonly exclude?: readonly string[];
+  /**
+   * The tsconfig that supplies compiler options and module resolution; `tsconfig.json` when omitted.
+   */
+  readonly tsConfig?: string;
+}
+
+/**
  * Options of the `command-types` check: every command type a file exports is derived from a schema.
  */
 export interface CommandTypesOptions {
@@ -414,6 +440,7 @@ export type SettingsReviewThreadResolutionOptions = SettingsOptions;
  */
 export interface CheckOptionsByName {
   readonly 'aggregate-mappers': AggregateMappersOptions;
+  readonly 'codec-pairs': CodecPairsOptions;
   readonly 'command-types': CommandTypesOptions;
   readonly 'derived-types': DerivedTypesOptions;
   readonly 'import-uphill': ImportGraphOptions;
