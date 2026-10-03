@@ -336,6 +336,48 @@ describe('workflow-version-single-source', () => {
 });
 
 describe('workflow-credentials', () => {
+  /**
+   * A setup step whose `.npmrc` reads `NODE_AUTH_TOKEN`, so a publish after it has a token variable to protect.
+   */
+  const SETUP_NODE_WITH_REGISTRY = '      - uses: actions/setup-node@v4\n        with:\n          registry-url: https://registry.npmjs.org\n';
+  const tokenlessJob = (steps: string): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n${steps}`;
+
+  it('names only the token variables that something in the job reads and that are not blanked', async () => {
+    const cwd = await makeTempDir();
+    const reported = async (steps: string): Promise<readonly string[]> => {
+      await writeFiles(cwd, { [CI]: tokenlessJob(steps) });
+
+      return (await workflowCredentials({ cwd, options: {} })).map((violation) => violation.message);
+    };
+
+    expect(await reported('      - run: pnpm publish\n        env:\n          NODE_AUTH_TOKEN: ""\n')).toEqual([]);
+    expect(await reported('      - run: npm publish\n')).toEqual([]);
+    expect(await reported(`${SETUP_NODE_WITH_REGISTRY}      - run: npm publish\n        env:\n          NODE_AUTH_TOKEN: ""\n`)).toEqual([]);
+    expect(await reported('      - run: npm publish\n' + SETUP_NODE_WITH_REGISTRY)).toEqual([]);
+    expect(await reported(`${SETUP_NODE_WITH_REGISTRY}      - run: npm publish\n`)).toEqual([
+      "job 'publish' publishes with an OIDC identity and no token, but does not set NODE_AUTH_TOKEN (read by the .npmrc actions/setup-node writes for registry-url) to the empty string, so a token inherited from the environment is used when the OIDC exchange fails; set it to the empty string to prevent that, or request provenance so that such a publish at least carries a traceable attestation",
+    ]);
+    expect(await reported('      - run: pnpm exec semantic-release\n        env:\n          NODE_AUTH_TOKEN: ""\n')).toEqual([
+      "job 'publish' publishes with an OIDC identity and no token, but does not set NPM_TOKEN (read by semantic-release's npm plugin) to the empty string, so a token inherited from the environment is used when the OIDC exchange fails; set it to the empty string to prevent that, or request provenance so that such a publish at least carries a traceable attestation",
+    ]);
+  });
+
+  it('protects the token variables the .npmrc of the working directory reads in its auth settings', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      '.npmrc': 'cache=${HOME}/.npm-cache\n# //registry.npmjs.org/:_authToken=${COMMENTED_TOKEN}\n//registry.npmjs.org/:_authToken=${EXAMPLE_TOKEN?}\n',
+      [CI]: tokenlessJob('      - run: npm publish\n'),
+    });
+
+    expect((await workflowCredentials({ cwd, options: {} })).map((violation) => violation.message.split(' to the empty string')[0])).toEqual([
+      "job 'publish' publishes with an OIDC identity and no token, but does not set EXAMPLE_TOKEN (read by the .npmrc of the working directory)",
+    ]);
+
+    await writeFiles(cwd, { [CI]: tokenlessJob("      - run: npm publish\n        env:\n          EXAMPLE_TOKEN: ''\n") });
+
+    expect(await workflowCredentials({ cwd, options: {} })).toEqual([]);
+  });
+
   it('reports attestation steps without id-token and attestations write, and a tokenless publish that neither blanks the tokens nor sets provenance', async () => {
     const violations = await workflowCredentials({ cwd: fixture('credentials', 'violating'), options: {} });
     const release = '.github/workflows/release.yml';
@@ -382,19 +424,19 @@ jobs:
     const cwd = await makeTempDir();
     await writeFiles(cwd, {
       'package.json': '{ "name": "x", "publishConfig": { "provenance": true } }',
-      [CI]: 'on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm publish\n',
+      [CI]: `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n${SETUP_NODE_WITH_REGISTRY}      - run: npm publish\n`,
     });
 
     expect(await workflowCredentials({ cwd, options: {} })).toEqual([]);
 
     await writeFiles(cwd, { 'package.json': '{ "name": "x", "publishConfig": { "access": "public" } }' });
 
-    expect(where(await workflowCredentials({ cwd, options: {} }))).toEqual([`workflow-credentials/tokenless-publish-unprotected ${CI}:8`]);
+    expect(where(await workflowCredentials({ cwd, options: {} }))).toEqual([`workflow-credentials/tokenless-publish-unprotected ${CI}:11`]);
   });
 
   it('accepts provenance asked for by a flag or NPM_CONFIG_PROVENANCE, and not one switched off with --provenance=false', async () => {
     const cwd = await makeTempDir();
-    const publish = (command: string, env = ''): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${command}\n${env}`;
+    const publish = (command: string, env = ''): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n${SETUP_NODE_WITH_REGISTRY}      - run: ${command}\n${env}`;
     const results: Record<string, number> = {};
     const cases: readonly (readonly [string, string, string?])[] = [
       ['flag', 'npm publish --provenance'],
@@ -413,7 +455,7 @@ jobs:
 
   it('reads a publish with package manager options before the subcommand, as a workspace publish is written', async () => {
     const cwd = await makeTempDir();
-    const publish = (command: string): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${command}\n`;
+    const publish = (command: string): string => `on: push\npermissions:\n  id-token: write\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n${SETUP_NODE_WITH_REGISTRY}      - run: ${command}\n`;
     const publishes = ['pnpm publish -r', 'pnpm -r publish', 'pnpm --filter example-package publish', 'pnpm --filter=example-package publish', 'npm -w packages/example publish'];
     const releaseTools = ['semantic-release', 'pnpm semantic-release', 'pnpm exec semantic-release', 'npx semantic-release', 'changeset publish', 'pnpm changeset publish', 'yarn changeset publish', 'pnpm exec changeset publish', 'npx changeset publish', 'lerna publish'];
     const notPublishes = ['pnpm -r exec echo publish', 'pnpm changeset version'];
