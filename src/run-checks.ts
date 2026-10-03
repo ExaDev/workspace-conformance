@@ -79,7 +79,7 @@ async function conformanceOf(options: RunChecksOptions): Promise<ConformanceConf
     throw new ConformanceError(`no 'conformance' section in ${options.cwd}; define it in exadev.config.ts or in exadev.conformance.config.ts`);
   }
 
-  return loaded;
+  return loaded.value;
 }
 
 async function layoutOf(options: RunChecksOptions, needed: readonly CheckName[]): Promise<LayoutConfig | undefined> {
@@ -94,7 +94,7 @@ async function layoutOf(options: RunChecksOptions, needed: readonly CheckName[])
     throw new ConformanceError(`${needed.join(', ')} read the workspace layout, and there is no 'layout' section in ${options.cwd}; define it in exadev.config.ts or in exadev.layout.config.ts`);
   }
 
-  return loaded;
+  return loaded.value;
 }
 
 function selected(config: ConformanceConfig, requested: readonly CheckName[] | undefined, online: boolean): readonly CheckName[] {

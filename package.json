@@ -6,7 +6,7 @@
     "workspace-conformance": "./dist/cli.js"
   },
   "dependencies": {
-    "@exadev/config": "^1.0.0",
+    "@exadev/config": "^2.1.0",
     "cosmiconfig-extends": "^1.0.1",
     "dependency-cruiser": "^18.4.0",
     "jsonc-parser": "^3.3.1",

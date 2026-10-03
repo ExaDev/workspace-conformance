@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       '@exadev/config':
-        specifier: ^1.0.0
-        version: 1.0.0(cosmiconfig@10.0.1)
+        specifier: ^2.1.0
+        version: 2.1.0(cosmiconfig@10.0.1)
       cosmiconfig-extends:
         specifier: ^1.0.1
         version: 1.0.1(cosmiconfig@10.0.1)
@@ -658,8 +658,8 @@ packages:
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@exadev/config@1.0.0':
-    resolution: {integrity: sha512-6qJXmyE84nB30Ak2rizEi59pkXH29u8UKHtI5HuPJMvg+j+HKbMeVPrml/LR0zXQ1xZh8R/GegM4oA/HLEK+RA==}
+  '@exadev/config@2.1.0':
+    resolution: {integrity: sha512-WnV6E+6oGUnA8t8mMQWKHkrg40XQGpaBzFzshgjj5KgVkwly2io5jgBbc6xYm5NE8CluAMhglYimWMJ2GCw0wg==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
@@ -4168,7 +4168,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@exadev/config@1.0.0(cosmiconfig@10.0.1)':
+  '@exadev/config@2.1.0(cosmiconfig@10.0.1)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       cosmiconfig: 10.0.1
