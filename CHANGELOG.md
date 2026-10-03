@@ -1,3 +1,15 @@
+# [1.7.0](https://github.com/ExaDev/workspace-conformance/compare/v1.6.0...v1.7.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* judge a peer dependency only when its range admits one version ([3ed2af3](https://github.com/ExaDev/workspace-conformance/commit/3ed2af3ae13e29beeca1118f77533f3d28e1692c))
+
+
+### Features
+
+* add the engines-floor check ([074d554](https://github.com/ExaDev/workspace-conformance/commit/074d55472c1f186f70d6b7c02687add4b910981f))
+
 # [1.6.0](https://github.com/ExaDev/workspace-conformance/compare/v1.5.0...v1.6.0) (2026-10-03)
 
 
