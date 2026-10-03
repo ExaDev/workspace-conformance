@@ -1,5 +1,5 @@
 import { mkdir, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -49,6 +49,14 @@ describe('eslint', () => {
       { code: 'eslint/rule-off', message: "the rule 'eqeqeq' is off for src/index.js (required: warn)", file: 'src/index.js' },
       { code: 'eslint/rule-missing', message: "the rule 'no-debugger' is not configured for src/index.js (required: warn)", file: 'src/index.js' },
     ]);
+  });
+
+  it('accepts a working directory relative to the process, as every other check does', async () => {
+    const options = { samples: ['src/index.js'], rules: { 'no-console': 'error' }, lint: true } as const;
+    const absolute = await eslint({ cwd: fixturePath('eslint', 'violating'), options });
+
+    expect(await eslint({ cwd: relative(process.cwd(), fixturePath('eslint', 'violating')), options })).toEqual(absolute);
+    expect(absolute.length).toBeGreaterThan(0);
   });
 
   it('does not judge a rule the sample is not required to have', async () => {

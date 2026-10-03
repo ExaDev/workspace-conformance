@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 import { type ConfigFileOptions, type LayoutConfig, layoutSection, loadSection } from '@exadev/config';
 import { validateStandard } from 'cosmiconfig-extends';
 
@@ -19,7 +21,7 @@ export const EXIT_CODES = { clean: 0, violations: 1, failed: 2 } as const;
  */
 export interface RunChecksOptions {
   /**
-   * The directory that holds the config files and that every path option is relative to.
+   * The directory that holds the config files and that every path option is relative to. A relative path is resolved against the working directory of the process, once, before any check runs.
    */
   readonly cwd: string;
   /**
@@ -167,7 +169,8 @@ function readImported(imported: ReadonlyMap<string, readonly Violation[]>, name:
  *
  * Violations do not throw. It throws `ConformanceError` when the checks cannot run (nothing enabled, a requested check disabled, a section missing) and `ConfigValidationError` when a section fails its schema, whether it was loaded from `cwd` or passed in.
  */
-export async function runChecks(options: RunChecksOptions): Promise<RunResult> {
+export async function runChecks(given: RunChecksOptions): Promise<RunResult> {
+  const options: RunChecksOptions = { ...given, cwd: resolve(given.cwd) };
   const config = await conformanceOf(options);
   const names = selected(config, options.checks, options.github !== undefined);
   const layout = await layoutOf(

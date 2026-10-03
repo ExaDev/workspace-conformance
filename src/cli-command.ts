@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { Violation } from './check';
@@ -80,8 +79,7 @@ async function runCheck(args: readonly string[], output: CommandOutput): Promise
 
     return EXIT_CODES.clean;
   }
-  const cwd = resolve(values.cwd ?? process.cwd());
-  const result = await runChecks({ cwd, ...(requested === undefined ? {} : { checks: requested }), ...(values.settings === true ? { github: clientFromEnvironment() } : {}) });
+  const result = await runChecks({ cwd: values.cwd ?? process.cwd(), ...(requested === undefined ? {} : { checks: requested }), ...(values.settings === true ? { github: clientFromEnvironment() } : {}) });
   for (const violation of result.violations) {
     output.stderr(formatViolation(violation));
   }
