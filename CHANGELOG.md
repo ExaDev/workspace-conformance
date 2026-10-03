@@ -1,3 +1,33 @@
+# [2.0.0](https://github.com/ExaDev/workspace-conformance/compare/v1.7.0...v2.0.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **eslint:** accept a working directory relative to the process ([0d13200](https://github.com/ExaDev/workspace-conformance/commit/0d1320020c6e8cd60b0e13f21bfa4b8e014ec944))
+* **eslint:** note how many files the lint covered ([24c5b7f](https://github.com/ExaDev/workspace-conformance/commit/24c5b7f97dfccd56a0229cc9d931e3f168d023fe))
+* **eslint:** report a message without a position at its file ([95b7e6e](https://github.com/ExaDev/workspace-conformance/commit/95b7e6ea88ae408438682f30ce76606a3279cf83))
+* **imports:** check the root package and fail when no package is found ([d91ea0e](https://github.com/ExaDev/workspace-conformance/commit/d91ea0e9d3793670a1dd90a8db3aed3cca981c4d))
+* **instruction-symlinks:** ask for a link only beside a tracked README ([c1c1096](https://github.com/ExaDev/workspace-conformance/commit/c1c1096e525fca17f2bd971ebde2197947dc305d))
+* **settings:** name GitHub's message and report a plan without rulesets ([d51d30b](https://github.com/ExaDev/workspace-conformance/commit/d51d30b2379b8dc9f002c59d63338741b5f0f787))
+
+
+### chore
+
+* **deps:** migrate to @exadev/config 2 ([34b1151](https://github.com/ExaDev/workspace-conformance/commit/34b1151958c1782010c7ee9ea809a707c0ce8651))
+
+
+### Features
+
+* **cli:** print the result as JSON or GitHub Actions annotations ([e504b0c](https://github.com/ExaDev/workspace-conformance/commit/e504b0c5aaf70989a29b58f2a72a4ce0d2c3f91c))
+
+
+### BREAKING CHANGES
+
+* **deps:** the configFiles option of runChecks is the
+ConfigFileOptions of @exadev/config 2, so merge and presetSchema are no
+longer top-level options; pass them per file shape as
+unified: { merge, presetSchema } and standalone: { merge, presetSchema }.
+
 # [1.7.0](https://github.com/ExaDev/workspace-conformance/compare/v1.6.0...v1.7.0) (2026-10-03)
 
 
