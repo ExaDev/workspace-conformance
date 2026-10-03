@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../../test/support/temp';
 import type { Violation } from '../check';
-import { workflowRunnerResolution } from './workflow-runner-resolution';
+import { DEFAULT_HOSTED_LABELS, workflowRunnerResolution } from './workflow-runner-resolution';
 
 afterEach(removeTempDirs);
 
@@ -73,8 +73,45 @@ jobs:
     expect(reported).toEqual([`'["self-hosted"]'`, `'["ubuntu-latest", "self-hosted"]'`, `'[]'`, `'ubuntu-latest'`, `'[{"group": "fleet"}]'`]);
 
     await writeFiles(cwd, { [CI]: workflow(`'["self-hosted"]'`) });
+    const [notHosted] = await workflowRunnerResolution({ cwd, options: {} });
+
+    expect(notHosted === undefined ? [] : where([notHosted])).toEqual([`workflow-runner-resolution/resolver-fallback-not-hosted ${CI}:3`]);
+    expect(notHosted?.message).toBe(
+      "the literal fallback of output 'runner' of resolver job 'resolve' names 'self-hosted', which matches no pattern of hostedLabels, so it is not known to offer a runner when resolution produces nothing; name a hosted label, or add the label's pattern to hostedLabels (extending DEFAULT_HOSTED_LABELS) if it is hosted, by GitHub or by a third party",
+    );
+
+    await writeFiles(cwd, { [CI]: workflow(`'[]'`) });
+
+    expect((await workflowRunnerResolution({ cwd, options: {} }))[0]?.message).toBe(
+      "the literal fallback of output 'runner' of resolver job 'resolve' is not a runner label or a non-empty list of them, so the jobs that read it have no runner when resolution produces nothing",
+    );
+  });
+
+  it('accepts a fallback to a third-party hosted label once its pattern extends the exported default', async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      [CI]: `on: push
+jobs:
+  resolve:
+    timeout-minutes: 5
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      runner: \${{ steps.r.outputs.runner || '["blacksmith-2vcpu-ubuntu-2404"]' }}
+    steps:
+      - id: r
+        run: echo
+  build:
+    needs: resolve
+    runs-on: \${{ fromJson(needs.resolve.outputs.runner) }}
+  test:
+    runs-on: ubuntu-latest
+  lint:
+    runs-on: ubuntu-latest
+`,
+    });
 
     expect(where(await workflowRunnerResolution({ cwd, options: {} }))).toEqual([`workflow-runner-resolution/resolver-fallback-not-hosted ${CI}:3`]);
+    expect(await workflowRunnerResolution({ cwd, options: { hostedLabels: [...DEFAULT_HOSTED_LABELS, '^blacksmith-'] } })).toEqual([]);
   });
 
   it('counts a runner group, and takes the hosted labels from the options', async () => {

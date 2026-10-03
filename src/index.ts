@@ -35,7 +35,7 @@ export { workflowJobOrdering } from './checks/workflow-job-ordering';
 export { workflowMergeGroup } from './checks/workflow-merge-group';
 export { workflowReleaseJob } from './checks/workflow-release-job';
 export { workflowRepositoryDispatch } from './checks/workflow-repository-dispatch';
-export { workflowRunnerResolution } from './checks/workflow-runner-resolution';
+export { DEFAULT_HOSTED_LABELS, workflowRunnerResolution } from './checks/workflow-runner-resolution';
 export { workflowSkippableJobs } from './checks/workflow-skippable-jobs';
 export { workflowUpdateBotCooldown } from './checks/workflow-update-bot-cooldown';
 export { workflowVersionSingleSource } from './checks/workflow-version-single-source';

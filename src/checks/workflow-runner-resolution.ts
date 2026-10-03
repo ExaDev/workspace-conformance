@@ -6,9 +6,9 @@ import { type Job, parseUses, type Workflow } from '../workflows/model';
 import { workflowViolation } from '../workflows/shared';
 
 /**
- * GitHub's own images: `ubuntu`, `windows` and `macos`, as `-latest`, a version, or a version with an architecture or size suffix, and `ubuntu-slim`.
+ * The `hostedLabels` used when the options set none: GitHub's own images, `ubuntu`, `windows` and `macos`, as `-latest`, a version, or a version with an architecture or size suffix, and `ubuntu-slim`. Setting `hostedLabels` replaces it, so a workflow that also falls back to a third-party hosted runner extends it: `[...DEFAULT_HOSTED_LABELS, '^blacksmith-']`.
  */
-const DEFAULT_HOSTED_LABELS: readonly string[] = ['^(?:ubuntu|windows|macos)-(?:latest|slim|[0-9][0-9.]*)(?:-(?:arm|intel|xlarge|large))*$'];
+export const DEFAULT_HOSTED_LABELS: readonly string[] = ['^(?:ubuntu|windows|macos)-(?:latest|slim|[0-9][0-9.]*)(?:-(?:arm|intel|xlarge|large))*$'];
 
 /**
  * `fromJson(needs.<job>.outputs.<name>)` in a `runs-on`.
@@ -102,15 +102,27 @@ function resolverViolations(resolver: Resolver, hosted: readonly RegExp[]): read
     violations.push(
       workflowViolation(resolver.workflow, 'workflow-runner-resolution/resolver-no-fallback', `output '${resolver.output}' of resolver job '${resolver.job.id}' has no literal fallback (\`|| '["<hosted label>"]'\`), so the jobs that read it have no runner when resolution produces nothing`, resolver.job.location),
     );
-  } else if (fallback.length === 0 || !fallback.every((label) => hosted.some((pattern) => pattern.test(label)))) {
+  } else if (fallback.length === 0) {
     violations.push(
       workflowViolation(
         resolver.workflow,
         'workflow-runner-resolution/resolver-fallback-not-hosted',
-        `the literal fallback of output '${resolver.output}' of resolver job '${resolver.job.id}' does not name only hosted runner labels, so it offers no runner when the self-hosted fleet is down`,
+        `the literal fallback of output '${resolver.output}' of resolver job '${resolver.job.id}' is not a runner label or a non-empty list of them, so the jobs that read it have no runner when resolution produces nothing`,
         resolver.job.location,
       ),
     );
+  } else {
+    const unhosted = fallback.filter((label) => !hosted.some((pattern) => pattern.test(label)));
+    if (unhosted.length > 0) {
+      violations.push(
+        workflowViolation(
+          resolver.workflow,
+          'workflow-runner-resolution/resolver-fallback-not-hosted',
+          `the literal fallback of output '${resolver.output}' of resolver job '${resolver.job.id}' names ${unhosted.map((label) => `'${label}'`).join(', ')}, which ${unhosted.length === 1 ? 'matches' : 'match'} no pattern of hostedLabels, so it is not known to offer a runner when resolution produces nothing; name a hosted label, or add the label's pattern to hostedLabels (extending DEFAULT_HOSTED_LABELS) if it is hosted, by GitHub or by a third party`,
+          resolver.job.location,
+        ),
+      );
+    }
   }
 
   return violations;
