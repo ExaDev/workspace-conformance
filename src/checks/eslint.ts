@@ -5,6 +5,7 @@ import type { ESLint } from 'eslint';
 
 import type { CheckFunction, SourceLocation, Violation } from '../check';
 import { isRecord } from '../config-files';
+import { findFiles } from '../files';
 import { ConformanceError } from '../errors';
 import type { EslintOptions, EslintRequiredSeverity, EslintSample } from '../options';
 import { relativePosix } from '../paths';
@@ -162,10 +163,29 @@ function byPosition(left: Violation, right: Violation): number {
   );
 }
 
+function files(count: number): string {
+  return count === 1 ? '1 file' : `${String(count)} files`;
+}
+
 /**
- * Lints the workspace through the Node API, with the repository's own config, and maps every message to a violation. A pattern that selects no linted file is itself a violation, since the workspace is then not linted at all.
+ * The files below `cwd` that ESLint has a configuration for (not ignored, and matched by a configuration block) and that the lint did not reach: the patterns are narrower than what the config covers.
  */
-async function lintViolations(cwd: string, eslint: ESLint, patterns: readonly string[]): Promise<readonly Violation[]> {
+async function unreachedFiles(cwd: string, eslint: ESLint, linted: ReadonlySet<string>): Promise<readonly string[]> {
+  const candidates = (await findFiles(cwd, ['**'])).filter((file) => !linted.has(resolve(cwd, file)));
+  const unreached: string[] = [];
+  for (const file of candidates) {
+    if (!(await eslint.isPathIgnored(file))) {
+      unreached.push(file);
+    }
+  }
+
+  return unreached;
+}
+
+/**
+ * Lints the workspace through the Node API, with the repository's own config, and maps every message to a violation. A pattern that selects no linted file is itself a violation, since the workspace is then not linted at all. It notes how many files it linted and how many files the config covers that the patterns did not reach.
+ */
+async function lintViolations(cwd: string, eslint: ESLint, patterns: readonly string[], note: ((text: string) => void) | undefined): Promise<readonly Violation[]> {
   const violations: Violation[] = [];
   const results = new Map<string, ESLint.LintResult>();
   for (const pattern of patterns) {
@@ -184,6 +204,14 @@ async function lintViolations(cwd: string, eslint: ESLint, patterns: readonly st
     for (const message of result.messages) {
       violations.push(messageViolation(cwd, result, message));
     }
+  }
+  if (note !== undefined) {
+    const unreached = await unreachedFiles(cwd, eslint, new Set(results.keys()));
+    note(
+      unreached.length === 0
+        ? `linted ${files(results.size)}`
+        : `linted ${files(results.size)}; ${unreached.length === 1 ? '1 other file has' : `${String(unreached.length)} other files have`} an ESLint configuration and ${unreached.length === 1 ? 'was' : 'were'} not reached by lintPatterns (${patterns.join(', ')})`,
+    );
   }
 
   return violations.sort(byPosition);
@@ -208,7 +236,7 @@ export const eslint: CheckFunction<EslintOptions> = async (context) => {
     violations.push(...(await sampleViolations(instance, sample, shared)));
   }
   if (options.lint === true) {
-    violations.push(...(await lintViolations(cwd, instance, options.lintPatterns ?? DEFAULT_LINT_PATTERNS)));
+    violations.push(...(await lintViolations(cwd, instance, options.lintPatterns ?? DEFAULT_LINT_PATTERNS, context.note)));
   }
 
   return violations;

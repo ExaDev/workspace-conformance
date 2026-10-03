@@ -80,6 +80,11 @@ async function runCheck(args: readonly string[], output: CommandOutput): Promise
     return EXIT_CODES.clean;
   }
   const result = await runChecks({ cwd: values.cwd ?? process.cwd(), ...(requested === undefined ? {} : { checks: requested }), ...(values.settings === true ? { github: clientFromEnvironment() } : {}) });
+  for (const entry of result.results) {
+    for (const note of entry.notes) {
+      output.stdout(`${entry.check}: ${note}\n`);
+    }
+  }
   for (const violation of result.violations) {
     output.stderr(formatViolation(violation));
   }

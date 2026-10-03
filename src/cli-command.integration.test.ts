@@ -1,6 +1,9 @@
+import { symlink } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fixturePath } from '../test/support/temp';
+import { copyFixture, fixturePath, removeTempDirs, writeFiles } from '../test/support/temp';
 import { runCommand } from './cli-command';
 import { checkNames } from './registry';
 import { EXIT_CODES } from './run-checks';
@@ -26,6 +29,8 @@ async function run(...args: readonly string[]): Promise<Captured> {
   return { code, stdout, stderr };
 }
 
+afterEach(removeTempDirs);
+
 describe('check', () => {
   it('exits 0 and names the checks that ran when nothing is found', async () => {
     const result = await run('check', '--cwd', fixturePath('imports', 'clean'));
@@ -45,6 +50,20 @@ describe('check', () => {
     expect(result.stderr).toBe(
       'core/kernel/src/index.ts: import-uphill/higher-rank: @fx/core-kernel (rank 0) imports features/billing/src/index.ts in @fx/features-billing (rank 1), a higher rank\n',
     );
+  });
+
+  it("prints each check's notes on standard output, before the summary", async () => {
+    const cwd = await copyFixture('eslint', 'lint');
+    await symlink(join(import.meta.dirname, '..', 'node_modules'), join(cwd, 'node_modules'));
+    await writeFiles(cwd, { 'exadev.conformance.config.ts': "export default { checks: { eslint: { samples: ['src/clean.js'], lint: true, lintPatterns: ['src/clean.js'] } } };\n" });
+
+    const result = await run('check', '--cwd', cwd);
+
+    expect(result).toEqual({
+      code: EXIT_CODES.clean,
+      stdout: 'eslint: linted 1 file; 3 other files have an ESLint configuration and were not reached by lintPatterns (src/clean.js)\nno violations from eslint\n',
+      stderr: '',
+    });
   });
 
   it('prints the line and column when a violation has a location', async () => {

@@ -87,6 +87,32 @@ describe('eslint', () => {
     expect(violations).toEqual([]);
   });
 
+  it('notes how many files it linted, and how many files ESLint would lint that the patterns did not reach', async () => {
+    const notes: string[] = [];
+    const note = (text: string): void => {
+      notes.push(text);
+    };
+
+    await eslint({ cwd: fixturePath('eslint', 'lint'), options: { samples: [], lint: true }, note });
+    await eslint({ cwd: fixturePath('eslint', 'lint'), options: { samples: [], lint: true, lintPatterns: ['src/clean.js'] }, note });
+
+    expect(notes).toEqual(['linted 4 files', 'linted 1 file; 3 other files have an ESLint configuration and were not reached by lintPatterns (src/clean.js)']);
+  });
+
+  it('notes nothing at the default level, which lints no file', async () => {
+    const notes: string[] = [];
+
+    await eslint({
+      cwd: fixturePath('eslint', 'lint'),
+      options: { samples: ['src/clean.js'] },
+      note: (text) => {
+        notes.push(text);
+      },
+    });
+
+    expect(notes).toEqual([]);
+  });
+
   it('reports a pattern whose files are all ignored, and one that matches no file, as nothing linted', async () => {
     const ignored = await eslint({ cwd: fixturePath('eslint', 'ignores-all'), options: { samples: [], lint: true, lintPatterns: ['src'] } });
     const missing = await eslint({ cwd: fixturePath('eslint', 'clean'), options: { samples: [], lint: true, lintPatterns: ['nowhere'] } });

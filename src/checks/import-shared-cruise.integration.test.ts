@@ -107,7 +107,7 @@ describe('import checks that share a cruise', () => {
     const result = await runChecks({ cwd: violating, config: { checks: { 'import-uphill': {} } }, layout: flat });
 
     expect(cruising.calls).toHaveLength(0);
-    expect(result.results).toEqual([{ check: 'import-uphill', violations: [] }]);
+    expect(result.results).toEqual([{ check: 'import-uphill', violations: [], notes: [] }]);
   });
 
   it('fail when the layout lacks what any one of them needs, before cruising', async () => {
