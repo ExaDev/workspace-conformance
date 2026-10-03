@@ -221,6 +221,7 @@ jobs:
 on: [push, pull_request]
 jobs:
   test:
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
   required-checks:
     needs: [test]
@@ -233,7 +234,45 @@ jobs:
 `,
     });
 
-    expect(where(await workflowJobOrdering({ cwd, options: {} }))).toEqual([`workflow-job-ordering/junction-fails-on-skipped ${CI}:6`]);
+    expect(where(await workflowJobOrdering({ cwd, options: {} }))).toEqual([`workflow-job-ordering/junction-fails-on-skipped ${CI}:7`]);
+  });
+
+  describe('a result tested with != "success"', () => {
+    const junction = (jobs: string, steps: string): string => `on: [push, pull_request]
+jobs:
+${jobs}  required-checks:
+    needs: [plan, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+${steps}`;
+    const plain = '  plan:\n    runs-on: ubuntu-latest\n  test:\n    needs: plan\n    runs-on: ubuntu-latest\n';
+    const skippable = "  plan:\n    runs-on: ubuntu-latest\n  test:\n    needs: plan\n    if: needs.plan.outputs.has-packages == 'true'\n    runs-on: ubuntu-latest\n";
+    const throughEnv = '      - env:\n          PLAN_RESULT: ${{ needs.plan.result }}\n          TEST_RESULT: ${{ needs.test.result }}\n        run: |\n          if [ "$PLAN_RESULT" != "success" ]; then exit 1; fi\n          if [ "${TEST_RESULT}" != "success" ]; then exit 1; fi\n';
+    const inExpressions = "      - if: needs.plan.result != 'success' || needs.test.result != 'success'\n        run: exit 1\n";
+
+    async function codes(jobs: string, steps: string): Promise<readonly string[]> {
+      const cwd = await makeTempDir();
+      await writeFiles(cwd, { [CI]: junction(jobs, steps) });
+
+      return (await workflowJobOrdering({ cwd, options: {} })).map((violation) => violation.code);
+    }
+
+    it('is a failure condition, whether the result is read through an environment variable or in the expression itself', async () => {
+      expect(await codes(plain, throughEnv)).toEqual([]);
+      expect(await codes(plain, inExpressions)).toEqual([]);
+    });
+
+    it('fails on a skip when an if can skip the job and the junction does not read what that if reads', async () => {
+      expect(await codes(skippable, throughEnv)).toEqual(['workflow-job-ordering/junction-fails-on-skipped']);
+      expect(await codes(skippable, inExpressions)).toEqual(['workflow-job-ordering/junction-fails-on-skipped']);
+    });
+
+    it('does not fail on a skip the junction handles by reading what the if reads', async () => {
+      const guarded = `      - env:\n          HAS_PACKAGES: \${{ needs.plan.outputs.has-packages }}\n          TEST_RESULT: \${{ needs.test.result }}\n        run: |\n          if [ "$HAS_PACKAGES" != "true" ]; then exit 0; fi\n          if [ "$TEST_RESULT" != "success" ]; then exit 1; fi\n`;
+
+      expect(await codes(skippable, guarded)).toEqual([]);
+    });
   });
 
   it('does not judge a role that has no job in the workflow', async () => {
