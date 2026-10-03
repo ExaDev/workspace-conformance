@@ -35,6 +35,7 @@ describe('conformanceSchema', () => {
         'workflow-runner-resolution': { hostedLabels: ['^ubuntu-'] },
         'workflow-version-single-source': {},
         'workflow-credentials': {},
+        'workflow-release-job': { releaseJobs: ['release', 'publish'] },
         'workflow-repository-dispatch': { defaultBranches: ['main'], assumeRequiredChecks: true },
         'workflow-update-bot-cooldown': { dependabot: '.github/dependabot.yml', renovate: 'renovate.json' },
         'workflow-merge-group': false,

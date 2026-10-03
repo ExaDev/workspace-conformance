@@ -14,6 +14,7 @@ import { workflowActionPinning } from './checks/workflow-action-pinning';
 import { workflowCredentials } from './checks/workflow-credentials';
 import { workflowJobOrdering } from './checks/workflow-job-ordering';
 import { workflowMergeGroup } from './checks/workflow-merge-group';
+import { workflowReleaseJob } from './checks/workflow-release-job';
 import { workflowRepositoryDispatch } from './checks/workflow-repository-dispatch';
 import { workflowRunnerResolution } from './checks/workflow-runner-resolution';
 import { workflowSkippableJobs } from './checks/workflow-skippable-jobs';
@@ -285,6 +286,12 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: 'Attestation steps have the permissions they need, and a tokenless publish cannot quietly use a token',
     select: (checks) => enabledOptions(checks['workflow-credentials']),
     check: workflowCredentials,
+  }),
+  'workflow-release-job': plain({
+    name: 'workflow-release-job',
+    description: 'The release job alone holds id-token, runs in an environment and persists no credentials, and no job with id-token passes an npm token secret',
+    select: (checks) => enabledOptions(checks['workflow-release-job']),
+    check: workflowReleaseJob,
   }),
   'workflow-repository-dispatch': plain({
     name: 'workflow-repository-dispatch',

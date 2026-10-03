@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../../test/support/temp';
-import type { Violation } from '../check';
+import { where } from '../../test/support/violations';
 import { ConformanceError } from '../errors';
 import { workflowActionPinning } from './workflow-action-pinning';
 import { workflowCredentials } from './workflow-credentials';
@@ -14,13 +14,6 @@ import { workflowUpdateBotCooldown } from './workflow-update-bot-cooldown';
 import { workflowVersionSingleSource } from './workflow-version-single-source';
 
 afterEach(removeTempDirs);
-
-/**
- * What a violation is, without its prose: the code, then the file and the line.
- */
-function where(violations: readonly Violation[]): readonly string[] {
-  return violations.map((violation) => `${violation.code} ${violation.file}${violation.location === undefined ? '' : `:${String(violation.location.line)}`}`);
-}
 
 function fixture(check: string, kind: string): string {
   return fixturePath('workflows', check, kind);

@@ -106,3 +106,13 @@ export function callsAlways(condition: string | undefined): boolean {
  * The default ids of junction jobs, shared by the checks that look for one.
  */
 export const DEFAULT_JUNCTION_JOBS: readonly string[] = ['required-checks'];
+
+/**
+ * The default ids of release jobs, shared by the checks that look for one.
+ */
+export const DEFAULT_RELEASE_JOBS: readonly string[] = ['release'];
+
+/**
+ * The variables a token for the npm registry is passed in.
+ */
+export const REGISTRY_TOKEN_VARIABLES: readonly string[] = ['NODE_AUTH_TOKEN', 'NPM_TOKEN'];
