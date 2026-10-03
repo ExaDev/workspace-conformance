@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
@@ -151,19 +152,21 @@ export function workspaceRoot(cwd: string, layout: LayoutConfig): string {
   return layout.root === undefined ? cwd : resolve(cwd, layout.root);
 }
 
+const PNPM_WORKSPACE_FILE = 'pnpm-workspace.yaml';
+
 /**
- * The package globs: `layout.packages`, else the `packages` list of `pnpm-workspace.yaml` in `root`.
+ * The `packages` list of `pnpm-workspace.yaml` in `root`, or `undefined` when there is no such file. A file that exists but cannot be read, or has no list of strings under `packages`, is a configuration error.
  */
-export async function workspacePatterns(root: string, layout: LayoutConfig): Promise<readonly string[]> {
-  if (layout.packages !== undefined) {
-    return layout.packages;
+export async function pnpmWorkspacePatterns(root: string): Promise<readonly string[] | undefined> {
+  const file = join(root, PNPM_WORKSPACE_FILE);
+  if (!existsSync(file)) {
+    return undefined;
   }
-  const file = join(root, 'pnpm-workspace.yaml');
   let source: string;
   try {
     source = await readFile(file, 'utf8');
   } catch (error) {
-    throw new ConformanceError(`the layout has no 'packages' and ${file} cannot be read`, { cause: error });
+    throw new ConformanceError(`${file} cannot be read`, { cause: error });
   }
   const document: unknown = parse(source);
   if (typeof document !== 'object' || document === null || !('packages' in document) || !Array.isArray(document.packages)) {
@@ -172,6 +175,21 @@ export async function workspacePatterns(root: string, layout: LayoutConfig): Pro
   const patterns: unknown[] = document.packages;
   if (!patterns.every((pattern) => typeof pattern === 'string')) {
     throw new ConformanceError(`${file}: every entry of 'packages' must be a string`);
+  }
+
+  return patterns;
+}
+
+/**
+ * The package globs: `layout.packages`, else the `packages` list of `pnpm-workspace.yaml` in `root`.
+ */
+export async function workspacePatterns(root: string, layout: LayoutConfig): Promise<readonly string[]> {
+  if (layout.packages !== undefined) {
+    return layout.packages;
+  }
+  const patterns = await pnpmWorkspacePatterns(root);
+  if (patterns === undefined) {
+    throw new ConformanceError(`the layout has no 'packages' and ${join(root, PNPM_WORKSPACE_FILE)} does not exist`);
   }
 
   return patterns;
