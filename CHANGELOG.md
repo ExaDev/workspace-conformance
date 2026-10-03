@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/ExaDev/workspace-conformance/compare/v1.3.0...v1.4.0) (2026-10-03)
+
+
+### Features
+
+* add derived-types check for exported types inferred from their schemas ([bdb77bd](https://github.com/ExaDev/workspace-conformance/commit/bdb77bd2fb3204d8c1b1c21f3fce81a0b0303ddc)), closes [#13](https://github.com/ExaDev/workspace-conformance/issues/13)
+
 # [1.3.0](https://github.com/ExaDev/workspace-conformance/compare/v1.2.2...v1.3.0) (2026-10-02)
 
 
