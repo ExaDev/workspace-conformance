@@ -1,3 +1,29 @@
+# [3.0.0](https://github.com/ExaDev/workspace-conformance/compare/v2.0.2...v3.0.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **import-graph:** exempt imports declared only in fields the layout does not read ([28671ce](https://github.com/ExaDev/workspace-conformance/commit/28671ce4579b9e4a5c762abe95b6e1bebb2b05b1))
+* **settings-merge-methods:** treat required linear history as blocking merge commits ([4898443](https://github.com/ExaDev/workspace-conformance/commit/48984433077469e8c456f0a92101d97f5b00d415))
+* **workflow-credentials:** require blanking only the token variables a publish reads ([18015f0](https://github.com/ExaDev/workspace-conformance/commit/18015f04cbbdfca64665ba36d5dcb3bd5a0b72c9))
+* **workflow-job-ordering:** read a junction's results through its environment variables ([6a789fa](https://github.com/ExaDev/workspace-conformance/commit/6a789fadb043cf57026004c1f2e80929f9c4545a))
+* **workflow-merge-group:** require the trigger only where a merge queue exists ([49ddccb](https://github.com/ExaDev/workspace-conformance/commit/49ddccb066bf021886142c5fc6cb707c7796c0e7))
+* **workflow-runner-resolution:** export the hosted label default and name the unhosted fallback ([3ef9bca](https://github.com/ExaDev/workspace-conformance/commit/3ef9bcab68ec1150104c9e204ab596f9f9da5e52))
+* **workflow-runner-resolution:** read a format() fallback through the reusable workflow's inputs ([40ef206](https://github.com/ExaDev/workspace-conformance/commit/40ef20629ac97e98663de214cc61e7d1ad32ffd7))
+
+
+### BREAKING CHANGES
+
+* **workflow-merge-group:** BranchRules has a required mergeQueue field. A custom
+GitHubClient must return it from branchRules: true when a merge_queue
+rule applies to the branch, else false. With a client, a run now asks
+it for the rules of the branch when a workflow lacks the trigger, so
+set the repository option of workflow-merge-group where the origin
+remote does not name the repository.
+* **settings-merge-methods:** BranchRules has a required requiredLinearHistory field.
+A custom GitHubClient must return it from branchRules: true when a
+required_linear_history rule applies to the branch, else false.
+
 ## [2.0.2](https://github.com/ExaDev/workspace-conformance/compare/v2.0.1...v2.0.2) (2026-10-03)
 
 
