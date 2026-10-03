@@ -27,6 +27,15 @@ describe('instruction-symlinks', () => {
     expect(await instructionSymlinks({ cwd, options: {} })).toEqual([]);
   });
 
+  it('does not ask for a link in a directory whose README is not tracked, since it would point at nothing', async () => {
+    const cwd = await createGitWorkspace({ 'README.md': '# x\n', 'AGENTS.md': { symlink: 'README.md' }, 'CLAUDE.md': { symlink: 'README.md' }, 'packages/a/index.ts': 'export {};\n', 'packages/b/README.md': '# b\n' });
+
+    expect(await instructionSymlinks({ cwd, options: { directories: ['.', 'packages/*'] } })).toEqual([
+      { code: 'instruction-symlinks/missing', message: 'packages/b/AGENTS.md is not tracked; commit it as a symbolic link to README.md', file: 'packages/b/AGENTS.md' },
+      { code: 'instruction-symlinks/missing', message: 'packages/b/CLAUDE.md is not tracked; commit it as a symbolic link to README.md', file: 'packages/b/CLAUDE.md' },
+    ]);
+  });
+
   it('reports a file that is committed as a regular file, even when it has the README content', async () => {
     const cwd = await createGitWorkspace({ 'README.md': '# x\n', 'AGENTS.md': '# x\n', 'CLAUDE.md': { symlink: 'README.md' } });
 
