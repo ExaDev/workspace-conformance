@@ -5,6 +5,7 @@ export { commandTypes, DEFAULT_INFERENCES } from './checks/command-types';
 export { commitTypes, PRESET_COMMIT_TYPES } from './checks/commit-types';
 export { DEFAULT_DERIVED_TYPE_INFERENCES, derivedTypes } from './checks/derived-types';
 export { dockerfilePackageManager } from './checks/dockerfile-package-manager';
+export { enginesFloor } from './checks/engines-floor';
 export { eslint } from './checks/eslint';
 export { importCrossSlice } from './checks/import-cross-slice';
 export { importCycles } from './checks/import-cycles';
@@ -40,6 +41,7 @@ export type {
   DerivedTypesOptions,
   DerivedTypesPair,
   DockerfilePackageManagerOptions,
+  EnginesFloorOptions,
   EslintOptions,
   EslintRequiredSeverity,
   EslintSample,

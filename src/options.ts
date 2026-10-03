@@ -176,6 +176,16 @@ export interface CommitTypesOptions {
 }
 
 /**
+ * Options of the `engines-floor` check: the `engines.node` range of a package is a subset of the `engines.node` range of each of its installed dependencies.
+ */
+export interface EnginesFloorOptions {
+  /**
+   * Globs of the package directories to judge, in the form of the `packages` list of `pnpm-workspace.yaml` (a `!` pattern excludes), relative to the directory the checks run in; `.` is the root package. The root package and the `packages` of `pnpm-workspace.yaml`, when that file exists, when omitted.
+   */
+  readonly packages?: readonly string[];
+}
+
+/**
  * Options of the `dockerfile-package-manager` check: a package manager version pinned in a Dockerfile is the one `packageManager` names.
  */
 export interface DockerfilePackageManagerOptions {
@@ -461,6 +471,7 @@ export interface CheckOptionsByName {
   readonly 'instruction-symlinks': InstructionSymlinksOptions;
   readonly 'single-storybook': SingleStorybookOptions;
   readonly 'commit-types': CommitTypesOptions;
+  readonly 'engines-floor': EnginesFloorOptions;
   readonly 'dockerfile-package-manager': DockerfilePackageManagerOptions;
   readonly 'migrations-directory': MigrationsDirectoryOptions;
   readonly eslint: EslintOptions;
