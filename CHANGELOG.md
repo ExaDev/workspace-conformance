@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/ExaDev/workspace-conformance/compare/v1.4.0...v1.5.0) (2026-10-03)
+
+
+### Features
+
+* add codec-pairs check for unpaired encoders and decoders ([0f39522](https://github.com/ExaDev/workspace-conformance/commit/0f39522dedbdb7324ffbadf8e521e5c0facebc54)), closes [#14](https://github.com/ExaDev/workspace-conformance/issues/14)
+
 # [1.4.0](https://github.com/ExaDev/workspace-conformance/compare/v1.3.0...v1.4.0) (2026-10-03)
 
 
