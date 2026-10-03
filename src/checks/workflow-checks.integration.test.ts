@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../../test/support/temp';
 import { where } from '../../test/support/violations';
 import { ConformanceError } from '../errors';
-import type { BranchRules, GitHubClient } from '../github';
+import { type BranchRules, type GitHubClient, RulesetsUnavailableError } from '../github';
 import { workflowActionPinning } from './workflow-action-pinning';
 import { workflowCredentials } from './workflow-credentials';
 import { workflowJobOrdering } from './workflow-job-ordering';
@@ -832,6 +832,23 @@ describe('workflow-merge-group', () => {
 
       expect(await workflowMergeGroup({ cwd: fixture('merge-group', 'clean'), options: { repository }, github })).toEqual([]);
       expect(branches()).toEqual([]);
+    });
+
+    const rejectingWith = (error: Error): GitHubClient => ({
+      repository: vi.fn<GitHubClient['repository']>().mockResolvedValue({ defaultBranch: 'trunk', allowRebaseMerge: true, allowSquashMerge: false, allowMergeCommit: false }),
+      branchRules: vi.fn<GitHubClient['branchRules']>().mockRejectedValue(error),
+    });
+
+    it('does not require the trigger when the plan of the repository has no rulesets, so no merge queue', async () => {
+      const github = rejectingWith(new RulesetsUnavailableError('Upgrade to GitHub Pro or make this repository public to enable this feature.'));
+
+      expect(await workflowMergeGroup({ cwd: fixture('merge-group', 'violating'), options: { repository }, github })).toEqual([]);
+    });
+
+    it('fails the run on any other refusal of the rules of the branch', async () => {
+      const refusal = new ConformanceError('GET /repos/example-org/example-repo/rules/branches/trunk failed: 403 Forbidden: Resource not accessible by personal access token');
+
+      await expect(workflowMergeGroup({ cwd: fixture('merge-group', 'violating'), options: { repository }, github: rejectingWith(refusal) })).rejects.toBe(refusal);
     });
   });
 });

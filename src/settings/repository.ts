@@ -31,7 +31,7 @@ export async function repositoryOf(cwd: string, options: SettingsOptions): Promi
 /**
  * The branch whose rules are read: `branch` from the options, else the repository's default branch.
  */
-export async function branchOf(github: GitHubClient, slug: RepositorySlug, options: SettingsOptions): Promise<string> {
+async function branchOf(github: GitHubClient, slug: RepositorySlug, options: SettingsOptions): Promise<string> {
   return options.branch ?? (await github.repository(slug)).defaultBranch;
 }
 
