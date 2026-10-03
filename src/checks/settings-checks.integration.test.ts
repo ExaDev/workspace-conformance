@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { addRemote, createGitWorkspace } from '../../test/support/git-workspace';
 import { fixturePath, removeTempDirs } from '../../test/support/temp';
-import type { BranchRules, GitHubClient, RepositorySettings, RepositorySlug } from '../github';
+import { type BranchRules, type GitHubClient, type RepositorySettings, type RepositorySlug, RulesetsUnavailableError } from '../github';
 import { settingsMergeMethods } from './settings-merge-methods';
 import { settingsRequiredChecks } from './settings-required-checks';
 import { settingsReviewThreadResolution } from './settings-review-thread-resolution';
@@ -169,5 +169,50 @@ describe('the repository a settings check reads', () => {
 
     expect(requests.repositories()).toEqual([SLUG]);
     await expect(settingsReviewThreadResolution({ cwd, options: { repository: 'example' }, github: client })).rejects.toThrow(/not written owner\/name/u);
+  });
+});
+
+describe('a repository whose plan has no rulesets', () => {
+  const PLAN_LIMIT = 'Upgrade to GitHub Pro or make this repository public to enable this feature.';
+
+  function planLimited(settings: RepositorySettings): GitHubClient {
+    return { repository: vi.fn<GitHubClient['repository']>().mockResolvedValue(settings), branchRules: vi.fn<GitHubClient['branchRules']>().mockRejectedValue(new RulesetsUnavailableError(PLAN_LIMIT)) };
+  }
+
+  it('reports that settings-required-checks cannot apply, with GitHub\'s message, instead of failing the run', async () => {
+    const violations = await settingsRequiredChecks({ cwd: fixturePath('workflows', 'settings-required-checks', 'with-junction'), options: { repository: REPOSITORY }, github: planLimited(REBASE_ONLY) });
+
+    expect(violations).toEqual([
+      {
+        code: 'settings-required-checks/rules-unavailable',
+        message: `the branch rules of ${REPOSITORY} cannot be read or enforced on its plan, so a status check cannot be required (GitHub: ${PLAN_LIMIT})`,
+        file: REPOSITORY,
+      },
+    ]);
+  });
+
+  it('reports that settings-review-thread-resolution cannot apply, with GitHub\'s message', async () => {
+    const violations = await settingsReviewThreadResolution({ cwd: '.', options: { repository: REPOSITORY }, github: planLimited(REBASE_ONLY) });
+
+    expect(violations).toEqual([
+      {
+        code: 'settings-review-thread-resolution/rules-unavailable',
+        message: `the branch rules of ${REPOSITORY} cannot be read or enforced on its plan, so resolving review conversations cannot be required (GitHub: ${PLAN_LIMIT})`,
+        file: REPOSITORY,
+      },
+    ]);
+  });
+
+  it('judges settings-merge-methods by the repository settings alone, since no rule applies to the branch', async () => {
+    expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: planLimited(REBASE_ONLY) })).toEqual([]);
+    expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: planLimited({ ...REBASE_ONLY, allowSquashMerge: true }) })).toEqual([
+      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merges; only rebase should be allowed`, file: REPOSITORY },
+    ]);
+  });
+
+  it('still fails the run on any other refusal', async () => {
+    const github: GitHubClient = { repository: vi.fn<GitHubClient['repository']>().mockResolvedValue(REBASE_ONLY), branchRules: vi.fn<GitHubClient['branchRules']>().mockRejectedValue(new Error('GET failed: 403 Forbidden: Resource not accessible by personal access token')) };
+
+    await expect(settingsReviewThreadResolution({ cwd: '.', options: { repository: REPOSITORY }, github })).rejects.toThrow('Resource not accessible');
   });
 });
