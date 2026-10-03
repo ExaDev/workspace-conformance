@@ -114,6 +114,65 @@ jobs:
     expect(await workflowRunnerResolution({ cwd, options: { hostedLabels: [...DEFAULT_HOSTED_LABELS, '^blacksmith-'] } })).toEqual([]);
   });
 
+  describe('a fallback built with format() from an input of the reusable workflow', () => {
+    const resolve = (input: string): string => `on:
+  workflow_call:
+    inputs:
+      fallback-label:
+        type: string
+${input}    outputs:
+      selected-runner:
+        value: \${{ jobs.determine-runner.outputs.selected-runner }}
+jobs:
+  determine-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      selected-runner: \${{ steps.fallback.outputs.selected-runner || format('["{0}"]', inputs.fallback-label) }}
+    steps:
+      - id: fallback
+        run: echo
+`;
+    const caller = (withBlock: string): string => `on: push
+jobs:
+  determine-runner:
+    uses: ./.github/workflows/resolve.yml
+${withBlock}  build:
+    needs: determine-runner
+    runs-on: \${{ fromJson(needs.determine-runner.outputs.selected-runner) }}
+`;
+    const RESOLVE = '.github/workflows/resolve.yml';
+
+    async function judge(input: string, withBlock: string, hostedLabels?: readonly string[]): Promise<readonly Violation[]> {
+      const cwd = await makeTempDir();
+      await writeFiles(cwd, { [RESOLVE]: resolve(input), [CI]: caller(withBlock) });
+
+      return workflowRunnerResolution({ cwd, options: hostedLabels === undefined ? {} : { hostedLabels } });
+    }
+
+    it('reads the input through its literal default', async () => {
+      expect(await judge('        default: ubuntu-24.04\n', '')).toEqual([]);
+      expect(await judge('        default: blacksmith-2vcpu-ubuntu-2404\n', '', [...DEFAULT_HOSTED_LABELS, '^blacksmith-'])).toEqual([]);
+
+      const [violation, ...rest] = await judge('        default: blacksmith-2vcpu-ubuntu-2404\n', '');
+
+      expect(rest).toEqual([]);
+      expect(violation?.code).toBe('workflow-runner-resolution/resolver-fallback-not-hosted');
+      expect(violation?.message).toContain("names 'blacksmith-2vcpu-ubuntu-2404'");
+    });
+
+    it('reads a literal the caller passes in place of the default', async () => {
+      expect(await judge('        default: self-hosted\n', '    with:\n      fallback-label: macos-15\n')).toEqual([]);
+    });
+
+    it('reports no fallback when the input has no value it can read', async () => {
+      const codes = async (input: string, withBlock: string): Promise<readonly string[]> => (await judge(input, withBlock)).map((violation) => violation.code);
+
+      expect(await codes('', '')).toEqual(['workflow-runner-resolution/resolver-no-fallback']);
+      expect(await codes('        default: ubuntu-latest\n', '    with:\n      fallback-label: ${{ vars.FALLBACK }}\n')).toEqual(['workflow-runner-resolution/resolver-no-fallback']);
+    });
+  });
+
   it('counts a runner group, and takes the hosted labels from the options', async () => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, {

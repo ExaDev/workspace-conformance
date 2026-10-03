@@ -56,3 +56,91 @@ export function unwrapped(expression: string): string {
 
   return enclosedByOneGroup(inner) ? unwrapped(inner.slice(1, -1)) : inner;
 }
+
+/**
+ * A string literal of an expression, whose body writes a quote as `''`.
+ */
+const STRING_LITERAL = /^'((?:[^']|'')*)'$/u;
+
+/**
+ * A call of `format`, whose name, like every function name in an expression, is case-insensitive.
+ */
+const FORMAT_CALL = /^format\s*\(([\s\S]*)\)$/iu;
+
+/**
+ * A reference to an input of the workflow.
+ */
+const INPUT_REFERENCE = /^inputs\.([\w-]+)$/u;
+
+/**
+ * A placeholder of a `format` pattern, or the doubled brace that writes a literal one.
+ */
+const FORMAT_PLACEHOLDER = /\{\{|\}\}|\{(\d+)\}/gu;
+
+/**
+ * The arguments of a call, split at the commas outside quotes and parentheses.
+ */
+function callArguments(text: string): readonly string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text.charAt(index);
+    if (character === "'") {
+      quoted = !quoted;
+    } else if (!quoted && character === '(') {
+      depth += 1;
+    } else if (!quoted && character === ')') {
+      depth -= 1;
+    } else if (!quoted && depth === 0 && character === ',') {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+
+  return parts.map((part) => part.trim());
+}
+
+/**
+ * `format(pattern, ...values)` as GitHub evaluates it: `{N}` is the value at index N and `{{` and `}}` are literal braces. `undefined` when a placeholder names a value that is not given, which GitHub rejects.
+ */
+function formatted(pattern: string, values: readonly string[]): string | undefined {
+  let text = '';
+  let end = 0;
+  for (const match of pattern.matchAll(FORMAT_PLACEHOLDER)) {
+    const index = match[1];
+    const value = index === undefined ? match[0].charAt(0) : values[Number(index)];
+    if (value === undefined) {
+      return undefined;
+    }
+    text += `${pattern.slice(end, match.index)}${value}`;
+    end = match.index + match[0].length;
+  }
+
+  return `${text}${pattern.slice(end)}`;
+}
+
+/**
+ * The value an operand of an expression has on every run, or `undefined` when that depends on the run: a string literal, an input whose value `inputs` gives, or `format()` of such values. An input `inputs` holds as `undefined`, or does not hold, is not known.
+ */
+export function constantString(operand: string, inputs: Readonly<Record<string, string | undefined>>): string | undefined {
+  const text = unwrapped(operand);
+  const literal = STRING_LITERAL.exec(text)?.[1];
+  if (literal !== undefined) {
+    return literal.replaceAll("''", "'");
+  }
+  const input = INPUT_REFERENCE.exec(text)?.[1];
+  if (input !== undefined) {
+    return Object.hasOwn(inputs, input) ? inputs[input] : undefined;
+  }
+  const call = FORMAT_CALL.exec(text)?.[1];
+  if (call === undefined) {
+    return undefined;
+  }
+  const [pattern, ...rest] = callArguments(call).map((argument) => constantString(argument, inputs));
+  const values = rest.filter((value): value is string => value !== undefined);
+
+  return pattern === undefined || values.length !== rest.length ? undefined : formatted(pattern, values);
+}
