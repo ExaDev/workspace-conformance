@@ -216,7 +216,7 @@ describe('a repository whose plan has no rulesets', () => {
   it('judges settings-merge-methods by the repository settings alone, since no rule applies to the branch', async () => {
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: planLimited(REBASE_ONLY) })).toEqual([]);
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: planLimited({ ...REBASE_ONLY, allowSquashMerge: true }) })).toEqual([
-      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merges; only rebase should be allowed`, file: REPOSITORY },
+      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merging; only rebase merging should be allowed`, file: REPOSITORY },
     ]);
   });
 
