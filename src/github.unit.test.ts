@@ -76,6 +76,7 @@ describe('createGitHubClient', () => {
         { type: 'pull_request', ruleset_id: 4, parameters: {} },
         { type: 'required_status_checks', ruleset_id: 5 },
         { type: 'required_linear_history', ruleset_id: 6 },
+        { type: 'merge_queue', ruleset_id: 7, parameters: { merge_method: 'REBASE', grouping_strategy: 'ALLGREEN' } },
       ],
     ]);
     const client = createGitHubClient({ token: 't', fetch: fake });
@@ -90,6 +91,7 @@ describe('createGitHubClient', () => {
         { requiredReviewThreadResolution: false, allowedMergeMethods: undefined },
       ],
       requiredLinearHistory: true,
+      mergeQueue: true,
     });
     expect(calls().map((call) => call.url)).toEqual(['https://api.github.com/repos/example-org/example-repo/rules/branches/release%2F1?per_page=100&page=1']);
   });
@@ -103,6 +105,7 @@ describe('createGitHubClient', () => {
 
     expect(rules.pullRequests).toEqual([{ requiredReviewThreadResolution: true, allowedMergeMethods: undefined }]);
     expect(rules.requiredLinearHistory).toBe(false);
+    expect(rules.mergeQueue).toBe(false);
     expect(calls().map((call) => call.url.slice(call.url.indexOf('?')))).toEqual(['?per_page=100&page=1', '?per_page=100&page=2']);
   });
 

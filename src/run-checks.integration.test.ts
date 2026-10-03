@@ -152,10 +152,10 @@ describe('runChecks with configFiles', () => {
 });
 
 describe('runChecks with the settings checks', () => {
-  const settings: ConformanceConfig = { checks: { 'workflow-merge-group': {}, 'settings-review-thread-resolution': { repository: 'example-org/example-repo' } } };
+  const settings: ConformanceConfig = { checks: { 'workflow-merge-group': { repository: 'example-org/example-repo' }, 'settings-review-thread-resolution': { repository: 'example-org/example-repo' } } };
   const github: GitHubClient = {
     repository: vi.fn<GitHubClient['repository']>().mockResolvedValue({ defaultBranch: 'main', allowRebaseMerge: true, allowSquashMerge: false, allowMergeCommit: false }),
-    branchRules: vi.fn<GitHubClient['branchRules']>().mockResolvedValue({ requiredStatusChecks: [], pullRequests: [], requiredLinearHistory: false }),
+    branchRules: vi.fn<GitHubClient['branchRules']>().mockResolvedValue({ requiredStatusChecks: [], pullRequests: [], requiredLinearHistory: false, mergeQueue: false }),
   };
 
   it('stays offline without a client, running only the checks that read files', async () => {

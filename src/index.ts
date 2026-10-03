@@ -1,4 +1,15 @@
-export type { CheckContext, CheckFunction, GitHubCheckContext, GitHubCheckFunction, LayoutCheckContext, LayoutCheckFunction, SourceLocation, Violation } from './check';
+export type {
+  CheckContext,
+  CheckFunction,
+  GitHubCheckContext,
+  GitHubCheckFunction,
+  LayoutCheckContext,
+  LayoutCheckFunction,
+  SettingsAwareCheckContext,
+  SettingsAwareCheckFunction,
+  SourceLocation,
+  Violation,
+} from './check';
 export { aggregateMappers } from './checks/aggregate-mappers';
 export { codecPairs } from './checks/codec-pairs';
 export { commandTypes, DEFAULT_INFERENCES } from './checks/command-types';

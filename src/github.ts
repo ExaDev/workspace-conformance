@@ -36,6 +36,10 @@ export interface BranchRules {
    * Whether a `required_linear_history` rule applies, which keeps merge commits off the branch.
    */
   readonly requiredLinearHistory: boolean;
+  /**
+   * Whether a `merge_queue` rule applies, so pull requests into the branch merge through a merge queue.
+   */
+  readonly mergeQueue: boolean;
 }
 
 /**
@@ -187,6 +191,7 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
           .filter((rule) => rule.type === 'pull_request')
           .map((rule) => ({ requiredReviewThreadResolution: rule.parameters?.required_review_thread_resolution === true, allowedMergeMethods: rule.parameters?.allowed_merge_methods })),
         requiredLinearHistory: rules.some((rule) => rule.type === 'required_linear_history'),
+        mergeQueue: rules.some((rule) => rule.type === 'merge_queue'),
       };
     },
   };

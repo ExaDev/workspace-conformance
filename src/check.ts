@@ -73,3 +73,18 @@ export interface GitHubCheckContext<Options> extends CheckContext<Options> {
  * A check that reads repository settings through the GitHub API. Its violations name the repository (`owner/name`) as the file.
  */
 export type GitHubCheckFunction<Options> = (context: GitHubCheckContext<Options>) => Promise<readonly Violation[]>;
+
+/**
+ * What a check that reads files, and the repository's settings too when it can, receives.
+ */
+export interface SettingsAwareCheckContext<Options> extends CheckContext<Options> {
+  /**
+   * The client to read the repository's settings through; absent when the run is offline, and the check then judges from the files alone.
+   */
+  readonly github?: GitHubClient;
+}
+
+/**
+ * A check that reads files and refines its judgement with the repository's settings when the run is given a GitHub client. It runs offline too, unlike a {@link GitHubCheckFunction}.
+ */
+export type SettingsAwareCheckFunction<Options> = (context: SettingsAwareCheckContext<Options>) => Promise<readonly Violation[]>;

@@ -154,7 +154,7 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
   'workflow-release-job': z.exactOptional(enabled(z.strictObject({ ...selection, releaseJobs: z.exactOptional(names) }))),
   'workflow-repository-dispatch': z.exactOptional(enabled(z.strictObject({ ...selection, defaultBranches: z.exactOptional(names), assumeRequiredChecks: z.exactOptional(z.boolean()) }))),
   'workflow-update-bot-cooldown': z.exactOptional(enabled(z.strictObject({ dependabot: z.exactOptional(path), renovate: z.exactOptional(path) }))),
-  'workflow-merge-group': z.exactOptional(enabled(z.strictObject(selection))),
+  'workflow-merge-group': z.exactOptional(enabled(z.strictObject({ ...selection, ...settings }))),
   'workflow-action-pinning': z.exactOptional(
     enabled(z.strictObject({ ...selection, thirdParty: z.exactOptional(pinningLevel), sameOrganisation: z.exactOptional(pinningLevel), organisations: z.exactOptional(names), allow: z.exactOptional(names) })),
   ),
