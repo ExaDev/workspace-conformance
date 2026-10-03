@@ -4,6 +4,7 @@ import type { CheckFunction, GitHubCheckFunction, Violation } from './check';
 import { aggregateMappers } from './checks/aggregate-mappers';
 import { commandTypes } from './checks/command-types';
 import { commitTypes } from './checks/commit-types';
+import { derivedTypes } from './checks/derived-types';
 import { dockerfilePackageManager } from './checks/dockerfile-package-manager';
 import { settingsMergeMethods } from './checks/settings-merge-methods';
 import { settingsRequiredChecks } from './checks/settings-required-checks';
@@ -175,6 +176,12 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: 'Every exported command type is derived from a schema, not hand-written',
     select: (checks) => enabledOptions(checks['command-types']),
     check: commandTypes,
+  }),
+  'derived-types': plain({
+    name: 'derived-types',
+    description: 'Every exported type in a file paired with schema files is derived from one of those schemas, not hand-written',
+    select: (checks) => enabledOptions(checks['derived-types']),
+    check: derivedTypes,
   }),
   'import-uphill': importCheck({
     name: 'import-uphill',

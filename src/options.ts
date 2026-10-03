@@ -50,6 +50,42 @@ export interface CommandTypesOptions {
 }
 
 /**
+ * A set of schema files and the files whose exported types must be derived from those schemas.
+ */
+export interface DerivedTypesPair {
+  /**
+   * Globs of the files that declare the schemas, relative to the directory the checks run in.
+   */
+  readonly schemas: readonly string[];
+  /**
+   * Globs of the files whose exported interfaces and type aliases must be derived from a schema declared in `schemas`.
+   */
+  readonly types: readonly string[];
+}
+
+/**
+ * Options of the `derived-types` check: every type a file exports is derived from a schema of its pair.
+ */
+export interface DerivedTypesOptions {
+  /**
+   * The schema files and the type files that must derive from them. Each type file is judged against the schemas of every pair that lists it.
+   */
+  readonly pairs: readonly DerivedTypesPair[];
+  /**
+   * Names of exported types that are deliberately written by hand.
+   */
+  readonly exclude?: readonly string[];
+  /**
+   * The last names of the generics that turn a schema into its type, and of the members that hold it, such as `infer` in `z.infer<typeof schema>` and `$inferSelect` in `typeof table.$inferSelect`. `infer`, `input`, `output`, `TypeOf`, `InferInput`, `InferOutput`, `InferSelectModel`, `InferInsertModel`, `$inferSelect` and `$inferInsert` when omitted.
+   */
+  readonly inferences?: readonly string[];
+  /**
+   * The tsconfig that supplies compiler options and module resolution; `tsconfig.json` when omitted.
+   */
+  readonly tsConfig?: string;
+}
+
+/**
  * Options shared by the checks that cruise the workspace's import graph.
  */
 export interface ImportGraphOptions {
@@ -379,6 +415,7 @@ export type SettingsReviewThreadResolutionOptions = SettingsOptions;
 export interface CheckOptionsByName {
   readonly 'aggregate-mappers': AggregateMappersOptions;
   readonly 'command-types': CommandTypesOptions;
+  readonly 'derived-types': DerivedTypesOptions;
   readonly 'import-uphill': ImportGraphOptions;
   readonly 'import-rank-skip': ImportGraphOptions;
   readonly 'import-cross-slice': ImportGraphOptions;

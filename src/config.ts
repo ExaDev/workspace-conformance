@@ -75,6 +75,16 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
   'command-types': z.exactOptional(
     enabled(z.strictObject({ commands: paths, exclude: z.exactOptional(names), inferences: z.exactOptional(paths), tsConfig: z.exactOptional(path) })),
   ),
+  'derived-types': z.exactOptional(
+    enabled(
+      z.strictObject({
+        pairs: z.array(z.strictObject({ schemas: paths, types: paths })).min(1),
+        exclude: z.exactOptional(names),
+        inferences: z.exactOptional(paths),
+        tsConfig: z.exactOptional(path),
+      }),
+    ),
+  ),
   'import-uphill': z.exactOptional(enabled(importGraph)),
   'import-rank-skip': z.exactOptional(enabled(importGraph)),
   'import-cross-slice': z.exactOptional(enabled(importGraph)),

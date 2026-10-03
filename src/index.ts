@@ -2,6 +2,7 @@ export type { CheckContext, CheckFunction, GitHubCheckContext, GitHubCheckFuncti
 export { aggregateMappers } from './checks/aggregate-mappers';
 export { commandTypes, DEFAULT_INFERENCES } from './checks/command-types';
 export { commitTypes, PRESET_COMMIT_TYPES } from './checks/commit-types';
+export { DEFAULT_DERIVED_TYPE_INFERENCES, derivedTypes } from './checks/derived-types';
 export { dockerfilePackageManager } from './checks/dockerfile-package-manager';
 export { eslint } from './checks/eslint';
 export { importCrossSlice } from './checks/import-cross-slice';
@@ -33,6 +34,8 @@ export type {
   CheckOptionsByName,
   CommandTypesOptions,
   CommitTypesOptions,
+  DerivedTypesOptions,
+  DerivedTypesPair,
   DockerfilePackageManagerOptions,
   EslintOptions,
   EslintRequiredSeverity,
