@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/ExaDev/workspace-conformance/compare/v1.5.0...v1.6.0) (2026-10-03)
+
+
+### Features
+
+* add workflow-release-job check for the publishing job's credentials ([0bd2928](https://github.com/ExaDev/workspace-conformance/commit/0bd2928abd600f33fdfda095e9296e7f8b73004a))
+
 # [1.5.0](https://github.com/ExaDev/workspace-conformance/compare/v1.4.0...v1.5.0) (2026-10-03)
 
 
