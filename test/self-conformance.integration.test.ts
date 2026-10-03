@@ -13,6 +13,7 @@ describe('this repository', () => {
           'instruction-symlinks': {},
           'single-storybook': { exclude: ['test/fixtures/**'] },
           'dockerfile-package-manager': { exclude: ['test/fixtures/**'] },
+          'engines-floor': {},
           'workflow-job-ordering': {},
           // The fallback is Blacksmith, which runs outside both the self-hosted fleet and GitHub's own billing.
           'workflow-runner-resolution': { hostedLabels: ['^blacksmith-', '^(?:ubuntu|windows|macos)-'] },
