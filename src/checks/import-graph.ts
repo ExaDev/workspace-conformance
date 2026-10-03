@@ -9,7 +9,7 @@ import type { LayoutCheckContext, Violation } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { relativePosix } from '../paths';
-import { type WorkspacePackage, readWorkspacePackages, workspaceRoot } from '../workspace/packages';
+import { isInPackage, type WorkspacePackage, readWorkspacePackages, workspaceRoot } from '../workspace/packages';
 import { graphScopePattern, type ImportRule } from '../workspace/rules';
 
 /**
@@ -67,7 +67,7 @@ export interface ImportCheckSpec {
  */
 export function packageOfPath(packages: readonly WorkspacePackage[], path: string): WorkspacePackage {
   const found =
-    packages.find((member) => path.startsWith(`${member.dir}/`)) ??
+    packages.find((member) => isInPackage(member.dir, path)) ??
     packages.find((member) => member.name !== undefined && (path === member.name || path.startsWith(`${member.name}/`)));
   if (found === undefined) {
     throw new ConformanceError(`${path} is in no workspace package, although the graph is limited to the packages' files and names`);
@@ -259,7 +259,7 @@ export function describePackage(member: WorkspacePackage): string {
  */
 export function describeTarget(edge: ImportEdge): string {
   const { to, toFile } = edge;
-  const byName = !toFile.startsWith(`${to.dir}/`) && to.name !== undefined && (toFile === to.name || toFile.startsWith(`${to.name}/`));
+  const byName = !isInPackage(to.dir, toFile) && to.name !== undefined && (toFile === to.name || toFile.startsWith(`${to.name}/`));
 
   return byName ? toFile : `${toFile} in ${describePackage(to)}`;
 }

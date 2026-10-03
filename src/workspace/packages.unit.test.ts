@@ -80,6 +80,16 @@ describe('classifyPackages', () => {
     expect(() => classifyPackages([named('a/one'), named('a/one/inner')], { groups: [{ name: 'a' }] })).toThrow("'a/one/inner' is inside the package directory 'a/one'");
   });
 
+  it('gives the root package the group whose path is the root', () => {
+    const [root] = classifyPackages([named('.', 'single')], { groups: [{ name: 'root', path: '.', rank: 0 }] });
+
+    expect(root).toEqual({ dir: '.', name: 'single', group: 'root', rank: 0, slice: undefined });
+  });
+
+  it('rejects the root package beside other packages, since every package directory is inside it', () => {
+    expect(() => classifyPackages([named('.'), named('a/one')], { groups: [{ name: 'root', path: '.' }, { name: 'a' }] })).toThrow("'a/one' is inside the package directory '.'");
+  });
+
   it('does not treat a directory that only shares a name prefix as nested', () => {
     const packages = classifyPackages([named('a/one'), named('a/one-more')], { groups: [{ name: 'a' }] });
 

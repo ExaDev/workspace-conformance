@@ -1,6 +1,6 @@
 import type { LayoutConfig, RankSkipOptions } from '@exadev/config';
 import { ConformanceError } from '../errors';
-import type { WorkspacePackage } from './packages';
+import { packagePathPrefix, type WorkspacePackage } from './packages';
 
 /**
  * A forbidden-dependency rule in the shape dependency-cruiser takes: a dependency from a file matching `from` to a file matching `to` is a violation.
@@ -20,10 +20,10 @@ function escapeRegExp(text: string): string {
 }
 
 /**
- * A regular expression, as source text, matching every file inside any of the packages. The trailing `/` keeps `packages/a` from matching `packages/ab`.
+ * A regular expression, as source text, matching every file inside any of the packages: the path starts with one's {@link packagePathPrefix}.
  */
 export function packagesPattern(packages: readonly WorkspacePackage[]): string {
-  return `^(${packages.map((member) => `${escapeRegExp(member.dir)}/`).join('|')})`;
+  return `^(${packages.map((member) => escapeRegExp(packagePathPrefix(member.dir))).join('|')})`;
 }
 
 /**
