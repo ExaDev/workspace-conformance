@@ -1,6 +1,6 @@
 import type { ConfigFileOptions, LayoutConfig } from '@exadev/config';
 
-import type { CheckFunction, GitHubCheckFunction, Violation } from './check';
+import type { CheckFunction, GitHubCheckFunction, SettingsAwareCheckFunction, Violation } from './check';
 import { aggregateMappers } from './checks/aggregate-mappers';
 import { codecPairs } from './checks/codec-pairs';
 import { commandTypes } from './checks/command-types';
@@ -45,7 +45,7 @@ export interface RunInput {
   readonly layout: LayoutConfig | undefined;
   readonly configFiles: ConfigFileOptions | undefined;
   /**
-   * The client the settings checks read through; `undefined` when the run is offline.
+   * The client the settings checks, and the checks that refine their judgement with the settings, read through; `undefined` when the run is offline.
    */
   readonly github: GitHubClient | undefined;
   /**
@@ -148,6 +148,29 @@ function online<Name extends CheckName, Options>(spec: {
       }
 
       return spec.check({ cwd, options, github, note, ...(configFiles === undefined ? {} : { configFiles }) });
+    },
+  };
+}
+
+function settingsAware<Name extends CheckName, Options>(spec: {
+  readonly name: Name;
+  readonly description: string;
+  readonly select: (checks: ChecksConfig) => Options | undefined;
+  readonly check: SettingsAwareCheckFunction<Options>;
+}): StandaloneCheck<Name> {
+  return {
+    name: spec.name,
+    description: spec.description,
+    requiresLayout: false,
+    requiresGitHub: false,
+    isEnabled: (checks) => spec.select(checks) !== undefined,
+    run: async ({ cwd, checks, configFiles, github }) => {
+      const options = spec.select(checks);
+      if (options === undefined) {
+        throw new ConformanceError(`the check '${spec.name}' is not enabled`);
+      }
+
+      return spec.check({ cwd, options, ...(github === undefined ? {} : { github }), ...(configFiles === undefined ? {} : { configFiles }) });
     },
   };
 }
@@ -316,7 +339,7 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     select: (checks) => enabledOptions(checks['workflow-update-bot-cooldown']),
     check: workflowUpdateBotCooldown,
   }),
-  'workflow-merge-group': plain({
+  'workflow-merge-group': settingsAware({
     name: 'workflow-merge-group',
     description: 'A workflow that runs for pull requests also runs for the merge queue',
     select: (checks) => enabledOptions(checks['workflow-merge-group']),

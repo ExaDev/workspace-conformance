@@ -385,9 +385,9 @@ export interface WorkflowUpdateBotCooldownOptions {
 }
 
 /**
- * Options of the `workflow-merge-group` check.
+ * Options of the `workflow-merge-group` check. `repository` and `branch` are read only when the run is given a GitHub client, to learn whether the branch has a merge queue.
  */
-export type WorkflowMergeGroupOptions = WorkflowSelection;
+export interface WorkflowMergeGroupOptions extends WorkflowSelection, SettingsOptions {}
 
 /**
  * How strictly a reference must be pinned: to a full commit SHA, or any ref (tag, branch or SHA).

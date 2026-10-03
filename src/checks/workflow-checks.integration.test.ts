@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../../test/support/temp';
 import { where } from '../../test/support/violations';
 import { ConformanceError } from '../errors';
+import type { BranchRules, GitHubClient } from '../github';
 import { workflowActionPinning } from './workflow-action-pinning';
 import { workflowCredentials } from './workflow-credentials';
 import { workflowJobOrdering } from './workflow-job-ordering';
@@ -838,6 +839,38 @@ describe('workflow-merge-group', () => {
 
   it('leaves out the workflows the options exclude', async () => {
     expect(await workflowMergeGroup({ cwd: fixture('merge-group', 'violating'), options: { exclude: ['.github/workflows/ci.yml'] } })).toEqual([]);
+  });
+
+  describe('given the repository settings', () => {
+    const repository = 'example-org/example-repo';
+    const clientWith = (mergeQueue: boolean): { readonly github: GitHubClient; readonly branches: () => readonly string[] } => {
+      const rules: BranchRules = { requiredStatusChecks: [], pullRequests: [], requiredLinearHistory: false, mergeQueue };
+      const branchRules = vi.fn<GitHubClient['branchRules']>().mockResolvedValue(rules);
+      const github: GitHubClient = { repository: vi.fn<GitHubClient['repository']>().mockResolvedValue({ defaultBranch: 'trunk', allowRebaseMerge: true, allowSquashMerge: false, allowMergeCommit: false }), branchRules };
+
+      return { github, branches: () => branchRules.mock.calls.map(([, branch]) => branch) };
+    };
+
+    it('does not require the trigger when no merge queue rule applies to the branch', async () => {
+      const { github, branches } = clientWith(false);
+
+      expect(await workflowMergeGroup({ cwd: fixture('merge-group', 'violating'), options: { repository }, github })).toEqual([]);
+      expect(branches()).toEqual(['trunk']);
+    });
+
+    it('requires the trigger when a merge queue rule applies to the branch the options name', async () => {
+      const { github, branches } = clientWith(true);
+
+      expect(where(await workflowMergeGroup({ cwd: fixture('merge-group', 'violating'), options: { repository, branch: 'release' }, github }))).toEqual([`workflow-merge-group/missing-trigger ${CI}:3`]);
+      expect(branches()).toEqual(['release']);
+    });
+
+    it('does not read the settings when every workflow already has the trigger', async () => {
+      const { github, branches } = clientWith(false);
+
+      expect(await workflowMergeGroup({ cwd: fixture('merge-group', 'clean'), options: { repository }, github })).toEqual([]);
+      expect(branches()).toEqual([]);
+    });
   });
 });
 
