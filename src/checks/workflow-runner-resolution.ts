@@ -1,4 +1,4 @@
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { ConformanceError } from '../errors';
 import type { WorkflowRunnerResolutionOptions } from '../options';
 import { DEFAULT_WORKFLOWS, loadWorkflows } from '../workflows/load';
@@ -101,8 +101,8 @@ function fallbackLabels(expression: string, inputs: Readonly<Record<string, stri
   return labels.length === items.length ? labels : [];
 }
 
-function resolverViolations(resolver: Resolver, hosted: readonly RegExp[]): readonly Violation[] {
-  const violations: Violation[] = [];
+function resolverViolations(resolver: Resolver, hosted: readonly RegExp[]): readonly FileViolation[] {
+  const violations: FileViolation[] = [];
   if (resolver.job.timeoutMinutes === undefined) {
     violations.push(
       workflowViolation(resolver.workflow, 'workflow-runner-resolution/resolver-no-timeout', `resolver job '${resolver.job.id}' has no timeout-minutes, so a runner that never starts holds every job waiting for it until the default six hours`, resolver.job.location),
@@ -143,7 +143,7 @@ function customLabels(job: Job, hosted: readonly RegExp[]): ReadonlySet<string> 
   return new Set([...job.runsOn.labels.filter((label) => !hosted.some((pattern) => pattern.test(label))), ...(job.runsOn.group === undefined ? [] : [`group:${job.runsOn.group}`])]);
 }
 
-function repeatedLabels(workflow: Workflow, hosted: readonly RegExp[]): readonly Violation[] {
+function repeatedLabels(workflow: Workflow, hosted: readonly RegExp[]): readonly FileViolation[] {
   const labelsByJob = workflow.jobs.map((job) => ({ job, labels: customLabels(job, hosted) }));
   const users = (label: string): readonly string[] => labelsByJob.filter((entry) => entry.labels.has(label)).map((entry) => entry.job.id);
 

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import type { LayoutCheckFunction, Violation } from '../check';
+import type { LayoutCheckFunction, FileViolation } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { relativePosix } from '../paths';
@@ -120,7 +120,7 @@ export const importCyclesSpec: ImportCheckSpec = {
     const inPackages = nameCycles(imports);
 
     const violations = [
-      ...[...inFiles.values()].map((ordered): Violation => {
+      ...[...inFiles.values()].map((ordered): FileViolation => {
         const [first] = ordered;
         if (first === undefined) {
           throw new ConformanceError('an import cycle with no files was reported');
@@ -128,7 +128,7 @@ export const importCyclesSpec: ImportCheckSpec = {
 
         return { code: 'import-cycles/cycle', message: `import cycle: ${[...ordered, first].join(' -> ')}`, file: relativePosix(cwd, join(root, first)) };
       }),
-      ...[...inPackages.values()].map((ring): Violation => {
+      ...[...inPackages.values()].map((ring): FileViolation => {
         const [first] = ring;
         if (first === undefined) {
           throw new ConformanceError('an import cycle with no packages was reported');

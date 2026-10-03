@@ -1,4 +1,4 @@
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import type { WorkflowJobOrderingOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { effectiveEnv, type Job, transitiveNeeds, type Workflow } from '../workflows/model';
@@ -131,11 +131,11 @@ function keepsOutOfPullRequests(expression: string | undefined): boolean {
 
 const OUTCOME_ACTION = 're-actors/alls-green';
 
-function releaseAndDocsOrdering(workflow: Workflow, options: WorkflowJobOrderingOptions): readonly Violation[] {
+function releaseAndDocsOrdering(workflow: Workflow, options: WorkflowJobOrderingOptions): readonly FileViolation[] {
   const releases = jobsNamed(workflow, options.releaseJobs ?? DEFAULT_RELEASE_JOBS);
   const deploys = jobsNamed(workflow, options.deployJobs ?? DEFAULT_DEPLOY_JOBS);
   const docs = jobsNamed(workflow, options.docsDeployJobs ?? DEFAULT_DOCS_DEPLOY_JOBS);
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const release of releases) {
     const waitsFor = transitiveNeeds(workflow, release.id);
     for (const deploy of deploys.filter((candidate) => candidate.id !== release.id && !waitsFor.has(candidate.id))) {
@@ -179,8 +179,8 @@ function exemptFromJunction(workflow: Workflow, junctionExempt: readonly string[
   return new Set(workflow.jobs.filter((job) => direct.has(job.id) || [...transitiveNeeds(workflow, job.id)].some((needed) => direct.has(needed))).map((job) => job.id));
 }
 
-function junctionOrdering(workflow: Workflow, options: WorkflowJobOrderingOptions): readonly Violation[] {
-  const violations: Violation[] = [];
+function junctionOrdering(workflow: Workflow, options: WorkflowJobOrderingOptions): readonly FileViolation[] {
+  const violations: FileViolation[] = [];
   const exempt = exemptFromJunction(workflow, options.junctionExempt ?? []);
   for (const junction of jobsNamed(workflow, options.junctionJobs ?? DEFAULT_JUNCTION_JOBS)) {
     if (!callsAlways(junction.condition)) {

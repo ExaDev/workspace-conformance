@@ -1,10 +1,12 @@
 export type {
   CheckContext,
   CheckFunction,
+  FileViolation,
   GitHubCheckContext,
   GitHubCheckFunction,
   LayoutCheckContext,
   LayoutCheckFunction,
+  RepositoryViolation,
   SettingsAwareCheckContext,
   SettingsAwareCheckFunction,
   SourceLocation,

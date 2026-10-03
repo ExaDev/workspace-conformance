@@ -36,9 +36,9 @@ async function branchOf(github: GitHubClient, slug: RepositorySlug, options: Set
 }
 
 /**
- * What a violation of a settings check names as its file.
+ * The repository a violation of a settings check names, `owner/name`.
  */
-export function repositoryFile(slug: RepositorySlug): string {
+export function repositoryName(slug: RepositorySlug): string {
   return `${slug.owner}/${slug.name}`;
 }
 
@@ -60,6 +60,6 @@ export async function branchRulesOf(github: GitHubClient, slug: RepositorySlug, 
 /**
  * The message of a `rules-unavailable` violation: the branch rules of the repository cannot be read or enforced on its plan, so `what` cannot be required.
  */
-export function rulesUnavailableMessage(file: string, what: string, githubMessage: string): string {
-  return `the branch rules of ${file} cannot be read or enforced on its plan, so ${what} cannot be required (GitHub: ${githubMessage})`;
+export function rulesUnavailableMessage(repository: string, what: string, githubMessage: string): string {
+  return `the branch rules of ${repository} cannot be read or enforced on its plan, so ${what} cannot be required (GitHub: ${githubMessage})`;
 }

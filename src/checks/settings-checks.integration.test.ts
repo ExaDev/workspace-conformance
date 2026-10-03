@@ -43,8 +43,8 @@ describe('settings-merge-methods', () => {
     const { client } = clientOf({ ...REBASE_ONLY, allowSquashMerge: true, allowMergeCommit: true }, NO_RULES);
 
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: client })).toEqual([
-      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merging; only rebase merging should be allowed`, file: REPOSITORY },
-      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows merge commits; only rebase merging should be allowed`, file: REPOSITORY },
+      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merging; only rebase merging should be allowed`, repository: REPOSITORY },
+      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows merge commits; only rebase merging should be allowed`, repository: REPOSITORY },
     ]);
   });
 
@@ -54,7 +54,7 @@ describe('settings-merge-methods', () => {
 
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: linear.client })).toEqual([]);
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY, allowed: 'merge' }, github: mergeOnly.client })).toEqual([
-      { code: 'settings-merge-methods/method-unavailable', message: `${REPOSITORY} does not allow merge commits`, file: REPOSITORY },
+      { code: 'settings-merge-methods/method-unavailable', message: `${REPOSITORY} does not allow merge commits`, repository: REPOSITORY },
     ]);
   });
 
@@ -101,8 +101,8 @@ describe('settings-required-checks', () => {
     const { client } = clientOf(REBASE_ONLY, { ...NO_RULES, requiredStatusChecks: [{ contexts: ['test'], strict: false }] });
 
     expect(await settingsRequiredChecks({ cwd, options: { repository: REPOSITORY }, github: client })).toEqual([
-      { code: 'settings-required-checks/required-check-missing', message: `${REPOSITORY} does not require the check 'Required Checks' of .github/workflows/ci.yml`, file: REPOSITORY },
-      { code: 'settings-required-checks/not-strict', message: `${REPOSITORY} does not require branches to be up to date before merging`, file: REPOSITORY },
+      { code: 'settings-required-checks/required-check-missing', message: `${REPOSITORY} does not require the check 'Required Checks' of .github/workflows/ci.yml`, repository: REPOSITORY },
+      { code: 'settings-required-checks/not-strict', message: `${REPOSITORY} does not require branches to be up to date before merging`, repository: REPOSITORY },
     ]);
   });
 
@@ -148,7 +148,7 @@ describe('settings-review-thread-resolution', () => {
       {
         code: 'settings-review-thread-resolution/not-required',
         message: `no rule requires review conversations to be resolved before merging on the branch of ${REPOSITORY}`,
-        file: REPOSITORY,
+        repository: REPOSITORY,
       },
     ];
 
@@ -196,7 +196,7 @@ describe('a repository whose plan has no rulesets', () => {
       {
         code: 'settings-required-checks/rules-unavailable',
         message: `the branch rules of ${REPOSITORY} cannot be read or enforced on its plan, so a status check cannot be required (GitHub: ${PLAN_LIMIT})`,
-        file: REPOSITORY,
+        repository: REPOSITORY,
       },
     ]);
   });
@@ -208,7 +208,7 @@ describe('a repository whose plan has no rulesets', () => {
       {
         code: 'settings-review-thread-resolution/rules-unavailable',
         message: `the branch rules of ${REPOSITORY} cannot be read or enforced on its plan, so resolving review conversations cannot be required (GitHub: ${PLAN_LIMIT})`,
-        file: REPOSITORY,
+        repository: REPOSITORY,
       },
     ]);
   });
@@ -216,7 +216,7 @@ describe('a repository whose plan has no rulesets', () => {
   it('judges settings-merge-methods by the repository settings alone, since no rule applies to the branch', async () => {
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: planLimited(REBASE_ONLY) })).toEqual([]);
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: planLimited({ ...REBASE_ONLY, allowSquashMerge: true }) })).toEqual([
-      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merging; only rebase merging should be allowed`, file: REPOSITORY },
+      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merging; only rebase merging should be allowed`, repository: REPOSITORY },
     ]);
   });
 

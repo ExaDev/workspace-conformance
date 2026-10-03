@@ -1,4 +1,4 @@
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import type { WorkflowReleaseJobOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { accessOf, effectiveEnv, effectivePermissions, type Job, type Step, type Workflow } from '../workflows/model';
@@ -24,7 +24,7 @@ function grantsIdToken(permissions: Job['permissions']): boolean {
   return accessOf(permissions, 'id-token') === 'write';
 }
 
-function idTokenViolations(workflow: Workflow, releases: readonly Job[]): readonly Violation[] {
+function idTokenViolations(workflow: Workflow, releases: readonly Job[]): readonly FileViolation[] {
   const releaseIds = new Set(releases.map((job) => job.id));
   const named = releaseJobsText(releases);
   const workflowLevel =
@@ -56,7 +56,7 @@ function persistedCredential(step: Step): string {
   return step.with['token'] === undefined ? 'the job token' : 'the token it was given';
 }
 
-function releaseJobViolations(workflow: Workflow, job: Job): readonly Violation[] {
+function releaseJobViolations(workflow: Workflow, job: Job): readonly FileViolation[] {
   if (job.uses !== undefined) {
     return [];
   }
@@ -92,11 +92,11 @@ function secretTokens(env: Readonly<Record<string, string>>): readonly string[] 
   return REGISTRY_TOKEN_VARIABLES.filter((variable) => FROM_SECRET.test(env[variable] ?? ''));
 }
 
-function tokenBesideOidcViolations(workflow: Workflow, job: Job): readonly Violation[] {
+function tokenBesideOidcViolations(workflow: Workflow, job: Job): readonly FileViolation[] {
   if (!grantsIdToken(effectivePermissions(workflow, job))) {
     return [];
   }
-  const report = (variables: readonly string[], location: Job['location']): readonly Violation[] =>
+  const report = (variables: readonly string[], location: Job['location']): readonly FileViolation[] =>
     variables.length === 0
       ? []
       : [

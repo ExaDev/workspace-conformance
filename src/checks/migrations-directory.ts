@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 
 import { findNodeAtLocation } from 'jsonc-parser';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { findFiles } from '../files';
 import { deployTools, generators } from '../migrations/adapters';
 import { firstExisting, parseJsoncTree, readConfigData } from '../migrations/config-data';
@@ -28,7 +28,7 @@ function locate(cwd: string, explicit: string | undefined, candidates: readonly 
   return explicit === undefined ? firstExisting(cwd, candidates) : firstExisting(cwd, [explicit]);
 }
 
-function missingConfig(explicit: string | undefined, candidates: readonly [string, ...string[]]): Violation {
+function missingConfig(explicit: string | undefined, candidates: readonly [string, ...string[]]): FileViolation {
   return explicit === undefined
     ? { code: 'migrations-directory/missing-config', message: `none of ${candidates.join(', ')} exists`, file: candidates[0] }
     : { code: 'migrations-directory/missing-config', message: `${explicit} does not exist`, file: explicit };
@@ -37,10 +37,10 @@ function missingConfig(explicit: string | undefined, candidates: readonly [strin
 /**
  * Violations for every script of the `package.json` at `file` that matches `command`.
  */
-async function scriptViolations(cwd: string, file: string, command: Readonly<RegExp>, describe: (script: string, name: string) => string): Promise<readonly Violation[]> {
+async function scriptViolations(cwd: string, file: string, command: Readonly<RegExp>, describe: (script: string, name: string) => string): Promise<readonly FileViolation[]> {
   const text = await readFile(resolve(cwd, file), 'utf8');
   const scripts = findNodeAtLocation(parseJsoncTree(text, file), ['scripts']);
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const entry of scripts?.children ?? []) {
     const [key, value] = entry.children ?? [];
     if (key?.type === 'string' && value?.type === 'string' && typeof value.value === 'string' && command.test(value.value)) {
@@ -64,7 +64,7 @@ async function scriptViolations(cwd: string, file: string, command: Readonly<Reg
 export const migrationsDirectory: CheckFunction<MigrationsDirectoryOptions> = async ({ cwd, options, configFiles }) => {
   const generator = generators[options.generator];
   const deployTool = deployTools[options.deployTool];
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
 
   const generatorFile = locate(cwd, options.generatorConfig, generator.configFiles);
   const deployFile = locate(cwd, options.deployConfig, deployTool.configFiles);

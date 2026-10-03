@@ -1,4 +1,4 @@
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { isRecord } from '../config-files';
 import type { WorkflowSkippableJobsOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
@@ -38,7 +38,7 @@ function filterJobsRead(workflow: Workflow, job: Job, actions: readonly string[]
  * Limits: a workflow is taken to produce a required check when it has a junction job, so a trigger path filter in a workflow without one is not reported; a path filter is recognised by the actions in the options, so a script that computes changed paths itself is not seen, and a job gated on the output of such a script is not reported; only the filters of the `pull_request` and `pull_request_target` triggers are read, so a `paths` filter on `push` is not reported; only `needs.<job>.outputs` in the job's own `if` is read. Whether the junction job really reports is judged by `workflow-job-ordering`.
  */
 export const workflowSkippableJobs: CheckFunction<WorkflowSkippableJobsOptions> = async ({ cwd, options }) => {
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const workflow of await loadWorkflows(cwd, options)) {
     const junctions = jobsNamed(workflow, options.junctionJobs ?? DEFAULT_JUNCTION_JOBS);
     if (junctions.length > 0) {

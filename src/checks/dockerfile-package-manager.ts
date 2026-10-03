@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { isRecord } from '../config-files';
 import { excludedFrom, findFiles } from '../files';
 import type { DockerfilePackageManagerOptions } from '../options';
@@ -89,7 +89,7 @@ export const dockerfilePackageManager: CheckFunction<DockerfilePackageManagerOpt
     return [{ code: 'dockerfile-package-manager/no-package-manager', message: `${packageJson} has no valid 'packageManager' field to compare Dockerfile pins with`, file: packageJson }];
   }
 
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const file of await findFiles(cwd, [...(options.dockerfiles ?? DEFAULT_DOCKERFILES), ...excludedFrom(options.exclude)])) {
     const variables = new Map<string, string | undefined>();
     (await readFile(resolve(cwd, file), 'utf8')).split('\n').forEach((text, index) => {

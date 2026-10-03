@@ -4,7 +4,7 @@ import { dirname, join, posix, resolve } from 'node:path';
 
 import { Range, subset, valid, validRange } from 'semver';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { isRecord } from '../config-files';
 import { ConformanceError } from '../errors';
 import type { EnginesFloorOptions } from '../options';
@@ -191,7 +191,7 @@ async function packageDirectories(cwd: string, options: EnginesFloorOptions): Pr
  * A dependency that is not installed fails the run: its range cannot be read, and passing it unjudged would read as a pass. An optional dependency and a peer dependency marked optional in `peerDependenciesMeta` may be absent and are then skipped.
  */
 export const enginesFloor: CheckFunction<EnginesFloorOptions> = async ({ cwd, options }) => {
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
 
   for (const directory of await packageDirectories(cwd, options)) {
     const file = posix.join(directory, MANIFEST);

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import type { WorkflowVersionSingleSourceOptions } from '../options';
 import { loadWorkflows } from '../workflows/load';
 import { hasExpression } from '../workflows/model';
@@ -55,7 +55,7 @@ function listedTools(content: string): ReadonlySet<string> {
 export const workflowVersionSingleSource: CheckFunction<WorkflowVersionSingleSourceOptions> = async ({ cwd, options }) => {
   const toolVersions = existsSync(resolve(cwd, TOOL_VERSIONS)) ? listedTools(await readFile(resolve(cwd, TOOL_VERSIONS), 'utf8')) : new Set<string>();
   const hasNvmrc = existsSync(resolve(cwd, NVMRC));
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const workflow of await loadWorkflows(cwd, options)) {
     for (const job of workflow.jobs) {
       for (const step of job.steps) {

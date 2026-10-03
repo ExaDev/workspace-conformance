@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { LayoutCheckFunction, Violation } from '../check';
+import type { LayoutCheckFunction, FileViolation } from '../check';
 import { ConformanceError } from '../errors';
 import type { ImportGraphOptions } from '../options';
 import { importsLayout, layoutWithoutIsolation, layoutWithoutRankSkip, layoutWithoutRanks, layoutWithoutSlices } from '../../test/support/layouts';
@@ -22,7 +22,7 @@ const checks: readonly { readonly name: string; readonly check: LayoutCheckFunct
   { name: 'import-cycles', check: importCycles, code: 'import-cycles/cycle', files: ['features/auth/src/index.ts'] },
 ];
 
-function summary(violations: readonly Violation[]): readonly (readonly [string, string])[] {
+function summary(violations: readonly FileViolation[]): readonly (readonly [string, string])[] {
   return violations.map((violation) => [violation.code, violation.file]);
 }
 

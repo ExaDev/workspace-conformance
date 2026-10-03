@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 
 import type { ESLint } from 'eslint';
 
-import type { CheckFunction, SourceLocation, Violation } from '../check';
+import type { CheckFunction, SourceLocation, FileViolation } from '../check';
 import { isRecord } from '../config-files';
 import { findFiles } from '../files';
 import { ConformanceError } from '../errors';
@@ -85,8 +85,8 @@ function sampleOf(sample: string | EslintSample): EslintSample {
   return typeof sample === 'string' ? { path: sample } : sample;
 }
 
-function ruleViolations(file: string, required: Readonly<Record<string, EslintRequiredSeverity>>, actual: ReadonlyMap<string, EffectiveSeverity>): readonly Violation[] {
-  return Object.entries(required).flatMap(([rule, severity]): readonly Violation[] => {
+function ruleViolations(file: string, required: Readonly<Record<string, EslintRequiredSeverity>>, actual: ReadonlyMap<string, EffectiveSeverity>): readonly FileViolation[] {
+  return Object.entries(required).flatMap(([rule, severity]): readonly FileViolation[] => {
     const found = actual.get(rule);
     if (found === undefined) {
       return [{ code: 'eslint/rule-missing', message: `the rule '${rule}' is not configured for ${file} (required: ${severity})`, file }];
@@ -102,7 +102,7 @@ function ruleViolations(file: string, required: Readonly<Record<string, EslintRe
   });
 }
 
-async function sampleViolations(eslint: ESLint, sample: EslintSample, shared: Readonly<Record<string, EslintRequiredSeverity>>): Promise<readonly Violation[]> {
+async function sampleViolations(eslint: ESLint, sample: EslintSample, shared: Readonly<Record<string, EslintRequiredSeverity>>): Promise<readonly FileViolation[]> {
   const file = sample.path;
   let config: unknown;
   try {
@@ -141,7 +141,7 @@ function locationOf(message: LintMessage): SourceLocation | undefined {
   return typeof line === 'number' && typeof column === 'number' ? { line, column } : undefined;
 }
 
-function messageViolation(cwd: string, result: ESLint.LintResult, message: LintMessage): Violation {
+function messageViolation(cwd: string, result: ESLint.LintResult, message: LintMessage): FileViolation {
   const file = relativePosix(cwd, result.filePath);
   const location = locationOf(message);
   const at = location === undefined ? { file } : { file, location };
@@ -154,7 +154,7 @@ function messageViolation(cwd: string, result: ESLint.LintResult, message: LintM
   return message.fatal === true ? { code: 'eslint/fatal', message: message.message, ...at } : { code: 'eslint/lint-message', message: message.message, ...at };
 }
 
-function byPosition(left: Violation, right: Violation): number {
+function byPosition(left: FileViolation, right: FileViolation): number {
   return (
     left.file.localeCompare(right.file) ||
     (left.location?.line ?? 0) - (right.location?.line ?? 0) ||
@@ -185,8 +185,8 @@ async function unreachedFiles(cwd: string, eslint: ESLint, linted: ReadonlySet<s
 /**
  * Lints the workspace through the Node API, with the repository's own config, and maps every message to a violation. A pattern that selects no linted file is itself a violation, since the workspace is then not linted at all. It notes how many files it linted and how many files the config covers that the patterns did not reach.
  */
-async function lintViolations(cwd: string, eslint: ESLint, patterns: readonly string[], note: ((text: string) => void) | undefined): Promise<readonly Violation[]> {
-  const violations: Violation[] = [];
+async function lintViolations(cwd: string, eslint: ESLint, patterns: readonly string[], note: ((text: string) => void) | undefined): Promise<readonly FileViolation[]> {
+  const violations: FileViolation[] = [];
   const results = new Map<string, ESLint.LintResult>();
   for (const pattern of patterns) {
     try {
@@ -231,7 +231,7 @@ export const eslint: CheckFunction<EslintOptions> = async (context) => {
   const EslintClass = loadEslint(cwd);
   const instance = new EslintClass({ cwd, ...(options.configFile === undefined ? {} : { overrideConfigFile: resolve(cwd, options.configFile) }) });
   const shared = options.rules ?? {};
-  const violations: Violation[] = [];
+  const violations: FileViolation[] = [];
   for (const sample of options.samples.map(sampleOf)) {
     violations.push(...(await sampleViolations(instance, sample, shared)));
   }

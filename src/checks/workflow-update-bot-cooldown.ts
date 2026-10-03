@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 import { parse, type ParseError, printParseErrorCode } from 'jsonc-parser';
 
-import type { CheckFunction, Violation } from '../check';
+import type { CheckFunction, FileViolation } from '../check';
 import { isRecord } from '../config-files';
 import { ConformanceError } from '../errors';
 import type { WorkflowUpdateBotCooldownOptions } from '../options';
@@ -41,7 +41,7 @@ function hasCooldown(update: unknown): boolean {
   return COOLDOWN_DAYS.some((setting) => typeof cooldown[setting] === 'number' && cooldown[setting] > 0);
 }
 
-async function dependabotViolations(cwd: string, file: string): Promise<readonly Violation[]> {
+async function dependabotViolations(cwd: string, file: string): Promise<readonly FileViolation[]> {
   const parsed = parseYaml(file, await readFile(resolve(cwd, file), 'utf8'));
   const updates = isRecord(parsed.value) && Array.isArray(parsed.value['updates']) ? parsed.value['updates'] : [];
 
@@ -82,7 +82,7 @@ function setsMinimumReleaseAge(value: unknown): boolean {
   );
 }
 
-async function renovateViolations(cwd: string, file: string): Promise<readonly Violation[]> {
+async function renovateViolations(cwd: string, file: string): Promise<readonly FileViolation[]> {
   const errors: ParseError[] = [];
   const value: unknown = parse(await readFile(resolve(cwd, file), 'utf8'), errors, { allowTrailingComma: true });
   const [error] = errors;
