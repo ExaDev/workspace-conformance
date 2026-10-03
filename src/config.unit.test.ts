@@ -21,6 +21,7 @@ describe('conformanceSchema', () => {
       checks: {
         'aggregate-mappers': { contracts: ['a.ts'], mapper: '{dir}/{name}.ts', adapters: '{dir}/*', exclude: ['X'], tsConfig: 'tsconfig.json' },
         'command-types': { commands: ['c.ts'], exclude: ['Command'], inferences: ['infer'], tsConfig: 'tsconfig.json' },
+        'derived-types': { pairs: [{ schemas: ['s.ts'], types: ['t.ts'] }], exclude: ['Union'], inferences: ['infer'], tsConfig: 'tsconfig.json' },
         'import-uphill': {},
         'import-rank-skip': { exclude: ['^x/'], doNotFollow: ['^y/'], tsConfig: 'tsconfig.json' },
         'import-cross-slice': false,
@@ -75,6 +76,13 @@ describe('conformanceSchema', () => {
     expect(await issuesOf({ checks: { 'aggregate-mappers': { mapper: 'x' } } })).toBeDefined();
     expect(await issuesOf({ checks: { 'command-types': true } })).toBeDefined();
     expect(await issuesOf({ checks: { 'import-uphill': true } })).toBeDefined();
+  });
+
+  it('rejects a derived-types check without pairs, or with a pair that lacks either list of globs', async () => {
+    expect(await issuesOf({ checks: { 'derived-types': { pairs: [] } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'derived-types': { pairs: [{ schemas: ['s.ts'] }] } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'derived-types': { pairs: [{ schemas: [], types: ['t.ts'] }] } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'derived-types': { pairs: [{ schemas: ['s.ts'], types: ['t.ts'], extra: 1 }] } } })).toBeDefined();
   });
 
   it('rejects a migrations-directory check without both tools, or with one that has no adapter', async () => {
