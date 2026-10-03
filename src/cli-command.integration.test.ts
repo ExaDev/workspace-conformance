@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { copyFixture, fixturePath, removeTempDirs, writeFiles } from '../test/support/temp';
-import { runCommand } from './cli-command';
+import { githubAnnotation, runCommand } from './cli-command';
 import { checkNames } from './registry';
-import { EXIT_CODES } from './run-checks';
+import { EXIT_CODES, type RunResult } from './run-checks';
 
 interface Captured {
   readonly code: number;
@@ -172,5 +172,79 @@ describe('the command', () => {
     expect(unknown.code).toBe(EXIT_CODES.failed);
     expect(unknown.stderr).toContain("unknown command 'nope'");
     expect(unknown.stderr).toContain('Usage: workspace-conformance check');
+  });
+});
+
+describe('check --format', () => {
+  it('prints the result of runChecks as JSON on standard output with json, and keeps the exit status', async () => {
+    const result = await run('check', '--cwd', fixturePath('imports', 'violating'), '--check', 'import-uphill', '--format', 'json');
+    const parsed: unknown = JSON.parse(result.stdout);
+    const expected: RunResult = {
+      results: [
+        {
+          check: 'import-uphill',
+          violations: [
+            {
+              code: 'import-uphill/higher-rank',
+              message: '@fx/core-kernel (rank 0) imports features/billing/src/index.ts in @fx/features-billing (rank 1), a higher rank',
+              file: 'core/kernel/src/index.ts',
+            },
+          ],
+          notes: [],
+        },
+      ],
+      violations: [
+        {
+          code: 'import-uphill/higher-rank',
+          message: '@fx/core-kernel (rank 0) imports features/billing/src/index.ts in @fx/features-billing (rank 1), a higher rank',
+          file: 'core/kernel/src/index.ts',
+        },
+      ],
+      exitCode: EXIT_CODES.violations,
+    };
+
+    expect(result.code).toBe(EXIT_CODES.violations);
+    expect(parsed).toEqual(expected);
+    expect(result.stderr).toBe('');
+  });
+
+  it('prints a clean result as JSON with exit status 0', async () => {
+    const result = await run('check', '--cwd', fixturePath('imports', 'clean'), '--format', 'json');
+
+    expect(result.code).toBe(EXIT_CODES.clean);
+    expect(JSON.parse(result.stdout)).toMatchObject({ violations: [], exitCode: EXIT_CODES.clean });
+  });
+
+  it('prints a GitHub Actions error annotation per violation with github, at its file relative to the directory the command runs in', async () => {
+    const result = await run('check', '--cwd', fixturePath('violating-locations'), '--format', 'github');
+
+    expect(result.code).toBe(EXIT_CODES.violations);
+    expect(result.stdout).toMatch(/^::error file=test\/fixtures\/violating-locations\/Dockerfile,line=2,col=22,title=dockerfile-package-manager\/version-mismatch::/u);
+    expect(result.stderr).toBe('');
+  });
+
+  it('prints text by default and with text', async () => {
+    const byDefault = await run('check', '--cwd', fixturePath('violating-locations'));
+
+    expect(await run('check', '--cwd', fixturePath('violating-locations'), '--format', 'text')).toEqual(byDefault);
+  });
+
+  it('exits 2 for a format it does not know, naming the ones it does', async () => {
+    const result = await run('check', '--cwd', fixturePath('imports', 'clean'), '--format', 'sarif');
+
+    expect(result.code).toBe(EXIT_CODES.failed);
+    expect(result.stderr).toContain("unknown format 'sarif'; the formats are text, json, github");
+  });
+});
+
+describe('githubAnnotation', () => {
+  it('escapes the characters a workflow command reserves, in the properties and in the message', () => {
+    expect(githubAnnotation({ code: 'a/b', message: '100% sure,\nnext: line', file: 'dir,x/file:1.ts', location: { line: 3, column: 4 } }, 'dir,x/file:1.ts')).toBe(
+      '::error file=dir%2Cx/file%3A1.ts,line=3,col=4,title=a/b::100%25 sure,%0Anext: line\n',
+    );
+  });
+
+  it('leaves out the position of a violation that has none', () => {
+    expect(githubAnnotation({ code: 'c/d', message: 'm', file: 'f' }, 'f')).toBe('::error file=f,title=c/d::m\n');
   });
 });

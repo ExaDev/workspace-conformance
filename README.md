@@ -285,10 +285,18 @@ Limits: classic branch protection and a merge queue's own merge method are not r
 ## Command line
 
 ```sh
-workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings]
+workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings] [--format <text|json|github>]
 ```
 
-`--cwd` is the directory that holds the config files (default: the current directory). `--check` runs only that check, which must be enabled, and may be repeated. `--list` prints every check and stops without reading any configuration. `--settings` also runs the enabled `settings-*` checks, which read the repository through the GitHub API with the token in `GITHUB_TOKEN` or `GH_TOKEN`; without it they are left out and the run is offline. Violations are printed to standard error as `file:line:column: code: message` (`file: code: message` for one without a position), and a check's notes to standard output as `check: note`.
+`--cwd` is the directory that holds the config files (default: the current directory). `--check` runs only that check, which must be enabled, and may be repeated. `--list` prints every check and stops without reading any configuration. `--settings` also runs the enabled `settings-*` checks, which read the repository through the GitHub API with the token in `GITHUB_TOKEN` or `GH_TOKEN`; without it they are left out and the run is offline. `--format` chooses how the result is printed, and never changes the exit status:
+
+| Format | Output |
+|---|---|
+| `text` | The default. Violations on standard error as `file:line:column: code: message` (`file: code: message` for one without a position), a check's notes on standard output as `check: note`, and on a clean run a line naming the checks that ran. |
+| `json` | One JSON document on standard output: the `RunResult` of `runChecks`, so `results` (each `{ check, violations, notes }`), `violations` (the library's `{ code, message, file, location? }` objects, with `file` relative to `--cwd`) and `exitCode`. |
+| `github` | A GitHub Actions error annotation per violation on standard output, `::error file=<file>,line=<line>,col=<column>,title=<code>::<message>` (no `line` and `col` without a position), and a `::notice` per note. The runner turns each into an annotation on the file ([workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message), [archived](https://web.archive.org/web/20260918001346/https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands)). `file` is relative to the directory the command runs in, the repository root in a workflow step unless it sets `working-directory`, so `--cwd` may name a subdirectory. Reserved characters are percent-encoded as `@actions/core` encodes them (`%`, carriage return and line feed everywhere, and `:` and `,` in properties; [`command.ts`](https://github.com/actions/toolkit/blob/main/packages/core/src/command.ts), [archived](https://web.archive.org/web/20250901085906/https://github.com/actions/toolkit/blob/main/packages/core/src/command.ts)). A settings violation names the repository rather than a file, so its annotation is attached to no file. |
+
+When the checks cannot run (exit status 2), the reason is printed to standard error as text in every format.
 
 | Exit status | Meaning |
 |---|---|
