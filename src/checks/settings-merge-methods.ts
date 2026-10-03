@@ -4,8 +4,15 @@ import { branchRulesOf, repositoryFile, repositoryOf } from '../settings/reposit
 
 const METHODS = ['rebase', 'squash', 'merge'] as const;
 
+type MergeMethod = (typeof METHODS)[number];
+
 /**
- * Only one merge method is available for a pull request into the branch, `rebase` unless the options say otherwise. A method is available when the repository allows it and no `pull_request` rule that applies to the branch leaves it out of its allowed methods.
+ * How a message names each method, in the words GitHub's settings page uses.
+ */
+const METHOD_NAMES: Readonly<Record<MergeMethod, string>> = { rebase: 'rebase merging', squash: 'squash merging', merge: 'merge commits' };
+
+/**
+ * Only one merge method is available for a pull request into the branch, `rebase` unless the options say otherwise. A method is available when the repository allows it, no `pull_request` rule that applies to the branch leaves it out of its allowed methods, and, for a merge commit, no `required_linear_history` rule applies, since that rule keeps merge commits off the branch.
  *
  * When the repository's plan has no rulesets, no rule applies to the branch and the repository settings alone decide.
  *
@@ -20,10 +27,15 @@ export const settingsMergeMethods: GitHubCheckFunction<SettingsMergeMethodsOptio
   const pullRequests = 'unavailable' in read ? [] : read.rules.pullRequests;
   const wanted = options.allowed ?? 'rebase';
   const repositoryAllows = { rebase: settings.allowRebaseMerge, squash: settings.allowSquashMerge, merge: settings.allowMergeCommit };
-  const available = METHODS.filter((method) => repositoryAllows[method] && pullRequests.every((rule) => rule.allowedMergeMethods === undefined || rule.allowedMergeMethods.includes(method)));
-  const violations: Violation[] = available.filter((method) => method !== wanted).map((method) => ({ code: 'settings-merge-methods/method-enabled', message: `${file} allows ${method} merges; only ${wanted} should be allowed`, file }));
+  // A plan without rulesets applies no rule to the branch, so no linear-history rule either.
+  const requiredLinearHistory = 'unavailable' in read ? false : read.rules.requiredLinearHistory;
+  const rulesAllow = (method: MergeMethod): boolean => !(method === 'merge' && requiredLinearHistory) && pullRequests.every((rule) => rule.allowedMergeMethods === undefined || rule.allowedMergeMethods.includes(method));
+  const available = METHODS.filter((method) => repositoryAllows[method] && rulesAllow(method));
+  const violations: Violation[] = available
+    .filter((method) => method !== wanted)
+    .map((method) => ({ code: 'settings-merge-methods/method-enabled', message: `${file} allows ${METHOD_NAMES[method]}; only ${METHOD_NAMES[wanted]} should be allowed`, file }));
   if (!available.includes(wanted)) {
-    violations.push({ code: 'settings-merge-methods/method-unavailable', message: `${file} does not allow ${wanted} merges`, file });
+    violations.push({ code: 'settings-merge-methods/method-unavailable', message: `${file} does not allow ${METHOD_NAMES[wanted]}`, file });
   }
 
   return violations;

@@ -274,7 +274,7 @@ All three take `repository` (`owner/name`; the `origin` remote of the working di
 
 | Check | Verifies | Codes |
 |---|---|---|
-| `settings-merge-methods` | Only one merge method (`allowed`, `rebase` by default) is available: the repository allows it and no `pull_request` rule of the branch leaves it out. | `method-enabled`, `method-unavailable` |
+| `settings-merge-methods` | Only one merge method (`allowed`, `rebase` by default) is available: the repository allows it, no `pull_request` rule of the branch leaves it out and, for merge commits, no `required_linear_history` rule of the branch blocks them. | `method-enabled`, `method-unavailable` |
 | `settings-required-checks` | A `required_status_checks` rule requires the check of each junction job (`junctionJobs`, found in the workflows selected by `workflows` and `exclude`; the check name is the job's `name`, else its id) and some rule sets strict mode. | `no-junction-job`, `no-required-checks`, `required-check-missing`, `not-strict`, `rules-unavailable` |
 | `settings-review-thread-resolution` | A `pull_request` rule requires review conversations to be resolved. | `not-required`, `rules-unavailable` |
 

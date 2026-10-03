@@ -12,7 +12,7 @@ afterEach(removeTempDirs);
 const REPOSITORY = 'example-org/example-repo';
 const SLUG: RepositorySlug = { owner: 'example-org', name: 'example-repo' };
 const REBASE_ONLY: RepositorySettings = { defaultBranch: 'main', allowRebaseMerge: true, allowSquashMerge: false, allowMergeCommit: false };
-const NO_RULES: BranchRules = { requiredStatusChecks: [], pullRequests: [] };
+const NO_RULES: BranchRules = { requiredStatusChecks: [], pullRequests: [], requiredLinearHistory: false };
 
 interface Requests {
   readonly repositories: () => readonly RepositorySlug[];
@@ -43,8 +43,18 @@ describe('settings-merge-methods', () => {
     const { client } = clientOf({ ...REBASE_ONLY, allowSquashMerge: true, allowMergeCommit: true }, NO_RULES);
 
     expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: client })).toEqual([
-      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merges; only rebase should be allowed`, file: REPOSITORY },
-      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows merge merges; only rebase should be allowed`, file: REPOSITORY },
+      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows squash merging; only rebase merging should be allowed`, file: REPOSITORY },
+      { code: 'settings-merge-methods/method-enabled', message: `${REPOSITORY} allows merge commits; only rebase merging should be allowed`, file: REPOSITORY },
+    ]);
+  });
+
+  it('does not report merge commits on a branch whose rules require linear history, which blocks them', async () => {
+    const linear = clientOf({ ...REBASE_ONLY, allowMergeCommit: true }, { ...NO_RULES, requiredLinearHistory: true });
+    const mergeOnly = clientOf({ ...REBASE_ONLY, allowRebaseMerge: false, allowMergeCommit: true }, { ...NO_RULES, requiredLinearHistory: true });
+
+    expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY }, github: linear.client })).toEqual([]);
+    expect(await settingsMergeMethods({ cwd: '.', options: { repository: REPOSITORY, allowed: 'merge' }, github: mergeOnly.client })).toEqual([
+      { code: 'settings-merge-methods/method-unavailable', message: `${REPOSITORY} does not allow merge commits`, file: REPOSITORY },
     ]);
   });
 

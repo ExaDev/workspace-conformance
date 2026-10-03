@@ -32,6 +32,10 @@ export interface BranchRules {
    * One entry per `pull_request` rule. `allowedMergeMethods` is undefined when the rule does not restrict them.
    */
   readonly pullRequests: readonly { readonly requiredReviewThreadResolution: boolean; readonly allowedMergeMethods: readonly string[] | undefined }[];
+  /**
+   * Whether a `required_linear_history` rule applies, which keeps merge commits off the branch.
+   */
+  readonly requiredLinearHistory: boolean;
 }
 
 /**
@@ -182,6 +186,7 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
         pullRequests: rules
           .filter((rule) => rule.type === 'pull_request')
           .map((rule) => ({ requiredReviewThreadResolution: rule.parameters?.required_review_thread_resolution === true, allowedMergeMethods: rule.parameters?.allowed_merge_methods })),
+        requiredLinearHistory: rules.some((rule) => rule.type === 'required_linear_history'),
       };
     },
   };
