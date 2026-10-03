@@ -75,6 +75,7 @@ describe('createGitHubClient', () => {
         { type: 'pull_request', ruleset_id: 3, parameters: { required_review_thread_resolution: true, allowed_merge_methods: ['rebase'], required_approving_review_count: 1 } },
         { type: 'pull_request', ruleset_id: 4, parameters: {} },
         { type: 'required_status_checks', ruleset_id: 5 },
+        { type: 'required_linear_history', ruleset_id: 6 },
       ],
     ]);
     const client = createGitHubClient({ token: 't', fetch: fake });
@@ -88,6 +89,7 @@ describe('createGitHubClient', () => {
         { requiredReviewThreadResolution: true, allowedMergeMethods: ['rebase'] },
         { requiredReviewThreadResolution: false, allowedMergeMethods: undefined },
       ],
+      requiredLinearHistory: true,
     });
     expect(calls().map((call) => call.url)).toEqual(['https://api.github.com/repos/example-org/example-repo/rules/branches/release%2F1?per_page=100&page=1']);
   });
@@ -97,7 +99,10 @@ describe('createGitHubClient', () => {
     const { fetch: fake, calls } = fakeFetch([full, [{ type: 'pull_request', parameters: { required_review_thread_resolution: true } }]]);
     const client = createGitHubClient({ token: 't', fetch: fake });
 
-    expect((await client.branchRules(SLUG, 'main')).pullRequests).toEqual([{ requiredReviewThreadResolution: true, allowedMergeMethods: undefined }]);
+    const rules = await client.branchRules(SLUG, 'main');
+
+    expect(rules.pullRequests).toEqual([{ requiredReviewThreadResolution: true, allowedMergeMethods: undefined }]);
+    expect(rules.requiredLinearHistory).toBe(false);
     expect(calls().map((call) => call.url.slice(call.url.indexOf('?')))).toEqual(['?per_page=100&page=1', '?per_page=100&page=2']);
   });
 
