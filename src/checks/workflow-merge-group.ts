@@ -1,6 +1,6 @@
 import type { SettingsAwareCheckFunction } from '../check';
 import type { WorkflowMergeGroupOptions } from '../options';
-import { branchOf, repositoryOf } from '../settings/repository';
+import { branchRulesOf, repositoryOf } from '../settings/repository';
 import { loadWorkflows } from '../workflows/load';
 import { workflowViolation } from '../workflows/shared';
 
@@ -9,7 +9,7 @@ import { workflowViolation } from '../workflows/shared';
  *
  * A workflow is taken to produce required checks when it is triggered by `pull_request`; `pull_request_target` is left out, since it runs trusted code against untrusted input and is not a place for required checks. The file cannot show which checks are required, so a `pull_request` workflow whose checks are not required is reported too: narrow the check with `workflows` and `exclude`. A `merge_group` trigger on a workflow with no `pull_request` trigger is not judged.
  *
- * Whether the branch has a merge queue is a setting, not something a file shows. Given a GitHub client, the check reads the rules of the branch (`branch`, else the default branch, of `repository`, else the `origin` remote) once it has found a workflow without the trigger, and reports only when a `merge_queue` rule applies, since without a queue no `merge_group` event is ever sent. Offline it cannot tell, so it reports every such workflow.
+ * Whether the branch has a merge queue is a setting, not something a file shows. Given a GitHub client, the check reads the rules of the branch (`branch`, else the default branch, of `repository`, else the `origin` remote) once it has found a workflow without the trigger, and reports only when a `merge_queue` rule applies, since without a queue no `merge_group` event is ever sent. A repository whose plan has no rulesets (the client rejects with `RulesetsUnavailableError`) has no merge queue either, since GitHub offers merge queues only in public repositories of an organisation and in private ones on GitHub Enterprise Cloud, both of which have rulesets, so nothing is reported for it; any other refusal fails the run. Offline it cannot tell, so it reports every such workflow.
  *
  * Limits: a `merge_group` trigger takes only `branches` filters (`paths` is a filter of `push`, `pull_request` and `pull_request_target`), so a workflow path-filtered for pull requests still runs in the queue once it has the trigger; the `branches` filter of a `merge_group` trigger is not read; only rulesets are read, so a queue configured through classic branch protection is not seen and, with a client, nothing is reported for it.
  */
@@ -24,8 +24,7 @@ export const workflowMergeGroup: SettingsAwareCheckFunction<WorkflowMergeGroupOp
   if (violations.length === 0 || github === undefined) {
     return violations;
   }
-  const slug = await repositoryOf(cwd, options);
-  const rules = await github.branchRules(slug, await branchOf(github, slug, options));
+  const branch = await branchRulesOf(github, await repositoryOf(cwd, options), options);
 
-  return rules.mergeQueue ? violations : [];
+  return 'rules' in branch && branch.rules.mergeQueue ? violations : [];
 };
