@@ -21,6 +21,12 @@ describe('importsOf', () => {
 
     expect(importsOf(content)).toEqual(['docs/a.md', 'docs/b.md', 'f.md']);
   });
+
+  it('closes a fence only with a run of the same character at least as long, so a fence shown inside another stays code', () => {
+    const content = ['````', '```', '@inside-a.md', '```', '````', '~~~', '```', '@inside-b.md', '~~~', '@after.md'].join('\n');
+
+    expect(importsOf(content)).toEqual(['after.md']);
+  });
 });
 
 describe('instruction-file-size', () => {
@@ -76,6 +82,23 @@ describe('instruction-file-size', () => {
     await writeFile(join(cwd, 'untracked.md'), 'x'.repeat(DEFAULT_MAX_INSTRUCTION_CHARACTERS));
 
     expect(await instructionFileSize({ cwd, options: {} })).toEqual([]);
+  });
+
+  it('follows an import that is itself a link, and counts nothing for a directory, a pattern or the parent directory', async () => {
+    const cwd = await createGitWorkspace({
+      'CLAUDE.md': '@docs @docs/ @*.md @.. @. @guide.md\n',
+      'guide.md': { symlink: 'docs/guide.md' },
+      'docs/guide.md': 'x'.repeat(LIMIT),
+      'docs/other.md': 'y'.repeat(LIMIT),
+    });
+
+    expect(await instructionFileSize({ cwd, options: { maxCharacters: LIMIT + 1 } })).toEqual([
+      {
+        code: 'instruction-file-size/too-large',
+        message: `CLAUDE.md is 46 characters with its imports (docs/guide.md: ${String(LIMIT)}), over the limit of ${String(LIMIT + 1)}; move detail into docs/ and leave a pointer to it`,
+        file: 'CLAUDE.md',
+      },
+    ]);
   });
 
   it('judges the index, so content staged over a smaller working tree file counts', async () => {
