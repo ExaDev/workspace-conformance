@@ -148,6 +148,28 @@ export interface InstructionSymlinksOptions {
 }
 
 /**
+ * Options of the `instruction-file-size` check: each agent instruction file, with what it imports, stays under a size an agent can load without crowding its context.
+ */
+export interface InstructionFileSizeOptions {
+  /**
+   * The instruction file names. `AGENTS.md` and `CLAUDE.md` when omitted.
+   */
+  readonly files?: readonly string[];
+  /**
+   * Globs of the directories that hold them, relative to the directory the checks run in. The directory itself (`.`) when omitted.
+   */
+  readonly directories?: readonly string[];
+  /**
+   * The most characters a file may hold, with the files it imports. 40,000 when omitted, the size at which Claude Code warns.
+   */
+  readonly maxCharacters?: number;
+  /**
+   * Whether `@path` imports are followed and counted. `true` when omitted.
+   */
+  readonly followImports?: boolean;
+}
+
+/**
  * Options of the `single-storybook` check.
  */
 export interface SingleStorybookOptions {
@@ -469,6 +491,7 @@ export interface CheckOptionsByName {
   readonly 'import-isolated-groups': ImportGraphOptions;
   readonly 'import-cycles': ImportGraphOptions;
   readonly 'instruction-symlinks': InstructionSymlinksOptions;
+  readonly 'instruction-file-size': InstructionFileSizeOptions;
   readonly 'single-storybook': SingleStorybookOptions;
   readonly 'commit-types': CommitTypesOptions;
   readonly 'engines-floor': EnginesFloorOptions;

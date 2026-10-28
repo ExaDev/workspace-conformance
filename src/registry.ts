@@ -28,6 +28,7 @@ import { importIsolatedGroupsSpec } from './checks/import-isolated-groups';
 import { importRankSkipSpec } from './checks/import-rank-skip';
 import { importUphillSpec } from './checks/import-uphill';
 import { eslint } from './checks/eslint';
+import { instructionFileSize } from './checks/instruction-file-size';
 import { instructionSymlinks } from './checks/instruction-symlinks';
 import { migrationsDirectory } from './checks/migrations-directory';
 import { singleStorybook } from './checks/single-storybook';
@@ -254,6 +255,12 @@ export const registry: { readonly [Name in CheckName]: RegisteredCheck<Name> } =
     description: 'Agent instruction files are git symlinks to the README beside them',
     select: (checks) => enabledOptions(checks['instruction-symlinks']),
     check: instructionSymlinks,
+  }),
+  'instruction-file-size': plain({
+    name: 'instruction-file-size',
+    description: 'Agent instruction files, with the files they import, stay under a size limit',
+    select: (checks) => enabledOptions(checks['instruction-file-size']),
+    check: instructionFileSize,
   }),
   'single-storybook': plain({
     name: 'single-storybook',
