@@ -160,6 +160,9 @@ function scopeOf(staged: boolean | undefined, base: string | undefined): ChangeS
   if (staged === true) {
     return { staged: true };
   }
+  if (base?.trim() === '') {
+    throw new TypeError('--base needs a revision; it was given an empty one, which would compare HEAD with itself and check nothing');
+  }
   if (base?.startsWith('-') === true) {
     throw new TypeError(`--base takes a revision, not an option: '${base}'`);
   }
@@ -182,11 +185,16 @@ function clientFromEnvironment(): GitHubClient {
 async function runCheck(args: readonly string[], output: CommandOutput): Promise<number> {
   const { values } = parseArgs({
     args: [...args],
-    options: { cwd: { type: 'string' }, check: { type: 'string', multiple: true }, list: { type: 'boolean' }, settings: { type: 'boolean' },
+    options: {
+      cwd: { type: 'string' },
+      check: { type: 'string', multiple: true },
+      list: { type: 'boolean' },
+      settings: { type: 'boolean' },
       staged: { type: 'boolean' },
       base: { type: 'string' },
       format: { type: 'string' },
-      help: { type: 'boolean', short: 'h' } },
+      help: { type: 'boolean', short: 'h' },
+    },
     allowPositionals: false,
   });
   if (values.help === true) {

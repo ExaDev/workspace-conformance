@@ -164,16 +164,43 @@ describe('check --staged and --base', () => {
     expect(await run('check', '--cwd', cwd, '--base', 'HEAD')).toEqual({ code: EXIT_CODES.clean, stdout: 'no violations in 0 changed files from instruction-symlinks\n', stderr: '' });
   });
 
-  it('exits 2 for both at once, a base that reads as an option, or a base git does not know', async () => {
+  it('compares with the merge base, so what the base branch did after the fork is not reported', async () => {
+    const cwd = await committedWorkspace();
+    runGit(cwd, ['branch', 'base']);
+    runGit(cwd, ['switch', '--quiet', 'base']);
+    await writeFiles(cwd, { 'CLAUDE.md': '# x\n' });
+    runGit(cwd, ['rm', '--quiet', '--cached', 'CLAUDE.md']);
+    commitAll(cwd, 'replace the link on the base');
+    runGit(cwd, ['switch', '--quiet', '-']);
+    await writeFiles(cwd, { 'notes.md': 'x\n' });
+    commitAll(cwd, 'add notes on the branch');
+
+    expect(await run('check', '--cwd', cwd, '--base', 'base')).toEqual({ code: EXIT_CODES.clean, stdout: 'no violations in 1 changed file from instruction-symlinks\n', stderr: '' });
+  });
+
+  it('takes paths relative to --cwd, leaving out changes outside it', async () => {
+    const root = await createGitWorkspace({ 'outside.md': 'x\n', 'sub/exadev.conformance.config.ts': CONFIG['exadev.conformance.config.ts'], 'sub/README.md': '# x\n', 'sub/CLAUDE.md': { symlink: 'README.md' }, 'sub/AGENTS.md': '# x\n' });
+    const cwd = join(root, 'sub');
+
+    expect(await run('check', '--cwd', cwd, '--staged', '--format', 'json').then((result) => JSON.parse(result.stdout) as RunResult)).toMatchObject({
+      files: ['AGENTS.md', 'CLAUDE.md', 'README.md', 'exadev.conformance.config.ts'],
+      violations: [{ code: 'instruction-symlinks/not-a-symlink', file: 'AGENTS.md' }],
+    });
+  });
+
+  it('exits 2 for both at once, an empty base, a base that reads as an option, or a base git does not know, saying what git said', async () => {
     const cwd = await committedWorkspace();
     const both = await run('check', '--cwd', cwd, '--staged', '--base', 'HEAD');
+    const empty = await run('check', '--cwd', cwd, '--base', '');
     const option = await run('check', '--cwd', cwd, '--base=--output=x');
     const unknown = await run('check', '--cwd', cwd, '--base', 'no-such-revision');
 
-    expect([both.code, option.code, unknown.code]).toEqual([EXIT_CODES.failed, EXIT_CODES.failed, EXIT_CODES.failed]);
+    expect([both.code, empty.code, option.code, unknown.code]).toEqual([EXIT_CODES.failed, EXIT_CODES.failed, EXIT_CODES.failed, EXIT_CODES.failed]);
     expect(both.stderr).toContain('give one of them');
+    expect(empty.stderr).toContain('empty one');
     expect(option.stderr).toContain('takes a revision, not an option');
-    expect(unknown.stderr).toContain('git diff');
+    expect(unknown.stderr).toContain('no-such-revision');
+    expect(unknown.stderr).toContain('shares history with HEAD');
   });
 
   it('is described in the usage', async () => {

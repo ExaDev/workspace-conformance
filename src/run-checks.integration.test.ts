@@ -161,6 +161,21 @@ describe('runChecks narrowed to files', () => {
     expect((await runChecks({ cwd, config, files: ['CLAUDE.md', 'README.md'] })).violations.map((violation) => violation.file)).toEqual(['CLAUDE.md']);
     expect((await runChecks({ cwd, config })).files).toBeUndefined();
   });
+
+  it('reports a violation about a directory when a file under it is named, and none when no file under it is', async () => {
+    const config: ConformanceConfig = { checks: { 'single-storybook': {} } };
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, { 'packages/ui/.storybook/main.ts': 'export default {};\n', 'packages/ui/.storybook-notes.md': 'x\n' });
+
+    expect((await runChecks({ cwd, config, files: ['packages/ui/.storybook/main.ts'] })).violations.map((violation) => violation.code)).toEqual(['single-storybook/misplaced']);
+    expect((await runChecks({ cwd, config, files: ['packages/ui/.storybook-notes.md'] })).violations).toEqual([]);
+  });
+
+  it('reports a violation naming a path that does not exist, since no change can be tied to it', async () => {
+    const cwd = await makeTempDir();
+
+    expect((await runChecks({ cwd, config: { checks: { 'commit-types': {} } }, files: [] })).violations.map((violation) => violation.code)).toContain('commit-types/missing-config');
+  });
 });
 
 describe('runChecks with the settings checks', () => {

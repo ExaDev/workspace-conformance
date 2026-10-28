@@ -15,13 +15,25 @@ export interface IndexEntry {
   readonly blob: string;
 }
 
-async function git(cwd: string, args: readonly string[]): Promise<string> {
+/**
+ * The most output a git command may print: a diff of a large branch lists tens of thousands of paths, past Node's default of 1 MiB.
+ */
+// 64 MiB.
+const GIT_MAX_BUFFER = 67_108_864;
+
+const INDEX_READER = 'this check reads the git index, so it needs a git working tree';
+
+/**
+ * Run git in `cwd` and return what it printed. A failure names the command, what git said, and `why` git was needed.
+ */
+async function git(cwd: string, args: readonly string[], why: string = INDEX_READER): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    execFile('git', [...args], { cwd, encoding: 'utf8' }, (error, stdout) => {
+    execFile('git', [...args], { cwd, encoding: 'utf8', maxBuffer: GIT_MAX_BUFFER }, (error, stdout, stderr) => {
       if (error === null) {
         resolve(stdout);
       } else {
-        reject(new ConformanceError(`git ${args.join(' ')} failed in ${cwd}; this check reads the git index, so it needs a git working tree`, { cause: error }));
+        const said = stderr.trim();
+        reject(new ConformanceError(`git ${args.join(' ')} failed in ${cwd}${said === '' ? '' : ` (${said})`}; ${why}`, { cause: error }));
       }
     });
   });
@@ -68,7 +80,11 @@ export type ChangeScope = { readonly staged: true } | { readonly base: string };
  */
 export async function changedFiles(cwd: string, scope: ChangeScope): Promise<readonly string[]> {
   const range = 'staged' in scope ? ['--cached'] : [`${scope.base}...HEAD`];
-  const listing = await git(cwd, ['diff', '--name-only', '--no-renames', '--relative', '-z', ...range, '--']);
+  const why =
+    'staged' in scope
+      ? 'a run on the staged files reads the git index, so it needs a git working tree'
+      : `a run against a base lists the files changed since the merge base of ${scope.base} and HEAD, so the base must be a revision git knows that shares history with HEAD (a shallow clone may lack it)`;
+  const listing = await git(cwd, ['diff', '--name-only', '--no-renames', '--relative', '-z', ...range, '--'], why);
 
   return listing
     .split('\0')

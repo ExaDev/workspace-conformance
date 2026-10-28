@@ -309,14 +309,15 @@ When the checks cannot run (exit status 2), the reason is printed to standard er
 
 `--staged` reports only the violations about files staged in the git index (added, modified or deleted), for a pre-commit hook; `--base <rev>` reports only those about files the commits since the merge base of `<rev>` and `HEAD` change, for a pre-push hook or a pull request (`--base origin/main`). The two are exclusive, and a `<rev>` that starts with `-` is refused. Paths are taken relative to `--cwd`, and files outside it are left out. On a clean run the summary says how many changed files it looked at, and `--format json` gives them as the result's `files`.
 
-Only what is reported is narrowed: every enabled check still reads the whole workspace, so a cross-file check sees everything it needs and a scoped run takes as long as a full one. A violation is reported when the file it names is among the changed files, and a violation about the repository's settings names no file and is always reported. A change can therefore break a check at a file it did not touch (a dependency upgrade that `engines-floor` reports at a `package.json`, a file imported into an instruction file that is reported at the instruction file) without a scoped run seeing it, so run the full check in CI as well. The index-reading checks (`instruction-symlinks`) judge what is staged; the others read the working tree, so unstaged edits to a staged file are judged too unless the hook hides them (lint-staged stashes unstaged changes while its tasks run). A pre-commit hook through lint-staged, where a function entry runs the command once without appending file names:
+Only what is reported is narrowed: every enabled check still reads the whole workspace, so a cross-file check sees everything it needs and a scoped run takes as long as a full one. A violation is reported when the file it names is among the changed files, or, for a violation that names a directory (`single-storybook` reports the misplaced `.storybook` directory), when a file under it is. A violation about the repository's settings, or one naming a path that does not exist (a missing config file, `eslint`'s pattern that matched nothing, an instruction file that is not tracked), cannot be tied to a change and is always reported. A change can still break a check at a file it did not touch (a dependency upgrade that `engines-floor` reports at a `package.json`) without a scoped run seeing it, so run the full check in CI as well. The index-reading checks (`instruction-symlinks`) judge what is staged; the others read the working tree, so unstaged edits to a staged file are judged too. Notes, such as how many files `eslint` linted, still describe the whole run.
 
-```ts
-// lint-staged.config.ts
-export default {
-  '*': () => 'workspace-conformance check --staged',
-};
+`--staged` reads the index itself, so a pre-commit hook runs it directly rather than through lint-staged, which picks files with `--diff-filter=ACMR` and so would skip a commit that only deletes a file. With husky, `.husky/pre-commit`:
+
+```sh
+pnpm exec workspace-conformance check --staged
 ```
+
+`--base` compares the merge base with `HEAD`, the checked-out commit. In a pre-push hook that is the branch being pushed only when it is the one checked out (`git push origin other-branch` pushes another), and a base such as `origin/main` is as fresh as the last fetch. In CI, fetch enough history for the merge base to exist (a shallow clone may lack it, which fails the run with exit status 2 rather than passing it), and an empty `--base` (an unset `$GITHUB_BASE_REF` on a push event) is refused rather than comparing `HEAD` with itself.
 
 ## Library
 
