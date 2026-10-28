@@ -286,10 +286,10 @@ Limits: classic branch protection and a merge queue's own merge method are not r
 ## Command line
 
 ```sh
-workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings] [--format <text|json|github>]
+workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings] [--staged | --base <rev>] [--format <text|json|github>]
 ```
 
-`--cwd` is the directory that holds the config files (default: the current directory). `--check` runs only that check, which must be enabled, and may be repeated. `--list` prints every check and stops without reading any configuration. `--settings` also runs the enabled `settings-*` checks, which read the repository through the GitHub API with the token in `GITHUB_TOKEN` or `GH_TOKEN`; without it they are left out and the run is offline. `--format` chooses how the result is printed, and never changes the exit status:
+`--cwd` is the directory that holds the config files (default: the current directory). `--check` runs only that check, which must be enabled, and may be repeated. `--list` prints every check and stops without reading any configuration. `--settings` also runs the enabled `settings-*` checks, which read the repository through the GitHub API with the token in `GITHUB_TOKEN` or `GH_TOKEN`; without it they are left out and the run is offline. `--staged` and `--base <rev>` narrow what is reported to what a commit or a branch changes (see [Checking only what changed](#checking-only-what-changed)). `--format` chooses how the result is printed, and never changes the exit status:
 
 | Format | Output |
 |---|---|
@@ -305,6 +305,19 @@ When the checks cannot run (exit status 2), the reason is printed to standard er
 | 1 | At least one check found a violation. |
 | 2 | The checks could not run: a usage error, an unknown or disabled check, a missing or invalid section, or a layout the tool cannot resolve. |
 
+### Checking only what changed
+
+`--staged` reports only the violations about files staged in the git index (added, modified or deleted), for a pre-commit hook; `--base <rev>` reports only those about files the commits since the merge base of `<rev>` and `HEAD` change, for a pre-push hook or a pull request (`--base origin/main`). The two are exclusive, and a `<rev>` that starts with `-` is refused. Paths are taken relative to `--cwd`, and files outside it are left out. On a clean run the summary says how many changed files it looked at, and `--format json` gives them as the result's `files`.
+
+Only what is reported is narrowed: every enabled check still reads the whole workspace, so a cross-file check sees everything it needs and a scoped run takes as long as a full one. A violation is reported when the file it names is among the changed files, and a violation about the repository's settings names no file and is always reported. A change can therefore break a check at a file it did not touch (a dependency upgrade that `engines-floor` reports at a `package.json`, a file imported into an instruction file that is reported at the instruction file) without a scoped run seeing it, so run the full check in CI as well. The index-reading checks (`instruction-symlinks`) judge what is staged; the others read the working tree, so unstaged edits to a staged file are judged too unless the hook hides them (lint-staged stashes unstaged changes while its tasks run). A pre-commit hook through lint-staged, where a function entry runs the command once without appending file names:
+
+```ts
+// lint-staged.config.ts
+export default {
+  '*': () => 'workspace-conformance check --staged',
+};
+```
+
 ## Library
 
 ```ts
@@ -315,7 +328,7 @@ const result = await runChecks({ cwd: process.cwd() });
 // result.violations: all of them; result.exitCode: 0 or 1
 ```
 
-`cwd` may be absolute or relative to the working directory of the process; `runChecks` resolves it once, so every check, and every exported check function, accepts either. `runChecks` loads both sections from `cwd` unless you pass `config` (the `conformance` section) or `layout`, which are validated with the same schemas as the ones it loads, and takes `checks` to run a subset, `github` (a `GitHubClient`, which switches the settings checks on) and `configFiles` (`alias`, `fsCache`, `trust`, and the `unified` and `standalone` layer options, each a `{ merge, presetSchema }` pair) for how config files load, with the same meaning as in `loadSection` of `@exadev/config`. Violations never throw. It throws `ConformanceError` when the checks cannot run and `ConfigValidationError` (from `@exadev/config`) when a section is invalid. Use it in a vitest test so the conformance suite runs with the rest:
+`cwd` may be absolute or relative to the working directory of the process; `runChecks` resolves it once, so every check, and every exported check function, accepts either. `runChecks` loads both sections from `cwd` unless you pass `config` (the `conformance` section) or `layout`, which are validated with the same schemas as the ones it loads, and takes `checks` to run a subset, `github` (a `GitHubClient`, which switches the settings checks on) and `configFiles` (`alias`, `fsCache`, `trust`, and the `unified` and `standalone` layer options, each a `{ merge, presetSchema }` pair) for how config files load, with the same meaning as in `loadSection` of `@exadev/config`. `files` (paths relative to `cwd` with `/` separators, such as `git diff --name-only --relative` prints) narrows the violations reported to those about the files named, keeping the ones about the repository's settings, and is echoed in the result's `files`. Violations never throw. It throws `ConformanceError` when the checks cannot run and `ConfigValidationError` (from `@exadev/config`) when a section is invalid. Use it in a vitest test so the conformance suite runs with the rest:
 
 ```ts
 import { runChecks } from 'workspace-conformance';

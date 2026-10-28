@@ -44,3 +44,20 @@ export async function createGitWorkspace(entries: Readonly<Record<string, GitEnt
 export function addRemote(directory: string, name: string, url: string): void {
   git(directory, ['remote', 'add', name, url]);
 }
+
+/**
+ * Stage every change in a repository made by {@link createGitWorkspace} and commit it, with no hooks, signing or user configuration of the machine involved, and return the commit's id.
+ */
+export function commitAll(directory: string, message: string): string {
+  git(directory, ['add', '--all', '--force']);
+  git(directory, ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '--quiet', '--allow-empty', '-m', message]);
+
+  return git(directory, ['rev-parse', 'HEAD']).trim();
+}
+
+/**
+ * Run git in a repository made by {@link createGitWorkspace}, for a case that changes the index after creating it.
+ */
+export function runGit(directory: string, args: readonly string[]): string {
+  return git(directory, args);
+}

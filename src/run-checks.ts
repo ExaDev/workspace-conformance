@@ -44,6 +44,10 @@ export interface RunChecksOptions {
    * The client the settings checks (`settings-*`) read the repository through. They run only when it is given, so a run without it stays offline and needs no token; naming one of them in `checks` without a client is an error.
    */
   readonly github?: GitHubClient;
+  /**
+   * Report only the violations about these files, relative to `cwd` with `/` separators, such as the files a commit or a branch changes. The checks still read the whole workspace, so a cross-file check sees everything; only what is reported is narrowed. Violations about the repository's settings are about no file and are always reported. Every violation is reported when omitted.
+   */
+  readonly files?: readonly string[];
 }
 
 /**
@@ -74,6 +78,10 @@ export interface RunResult {
    * {@link EXIT_CODES}`.clean` when there are no violations, else {@link EXIT_CODES}`.violations`.
    */
   readonly exitCode: typeof EXIT_CODES.clean | typeof EXIT_CODES.violations;
+  /**
+   * The files the violations were narrowed to, when the run was given `files`.
+   */
+  readonly files?: readonly string[];
 }
 
 async function conformanceOf(options: RunChecksOptions): Promise<ConformanceConfig> {
@@ -183,6 +191,7 @@ export async function runChecks(given: RunChecksOptions): Promise<RunResult> {
   );
 
   const imported = await runImportGraphChecks(options.cwd, layout, names, config.checks);
+  const scope = options.files === undefined ? undefined : new Set(options.files);
 
   const results: CheckResult[] = [];
   for (const name of names) {
@@ -191,10 +200,11 @@ export async function runChecks(given: RunChecksOptions): Promise<RunResult> {
     const note = (text: string): void => {
       notes.push(text);
     };
-    const violations = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles, github: options.github, note }) : readImported(imported, name);
+    const found = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles, github: options.github, note }) : readImported(imported, name);
+    const violations = scope === undefined ? found : found.filter((violation) => violation.file === undefined || scope.has(violation.file));
     results.push({ check: name, violations, notes });
   }
   const violations = results.flatMap((result) => result.violations);
 
-  return { results, violations, exitCode: violations.length === 0 ? EXIT_CODES.clean : EXIT_CODES.violations };
+  return { results, violations, exitCode: violations.length === 0 ? EXIT_CODES.clean : EXIT_CODES.violations, ...(options.files === undefined ? {} : { files: options.files }) };
 }

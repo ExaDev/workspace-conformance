@@ -57,3 +57,21 @@ export async function remoteUrl(cwd: string, name: string): Promise<string | und
 
   return (await git(cwd, ['config', '--get', `remote.${name}.url`])).trim();
 }
+
+/**
+ * What a run is scoped to: the changes staged in the index, or the changes the commits since the merge base of `base` and `HEAD` make.
+ */
+export type ChangeScope = { readonly staged: true } | { readonly base: string };
+
+/**
+ * The files `scope` changes (added, modified or deleted, a rename counting as both paths), relative to `cwd` with `/` separators and sorted; files outside `cwd` are left out.
+ */
+export async function changedFiles(cwd: string, scope: ChangeScope): Promise<readonly string[]> {
+  const range = 'staged' in scope ? ['--cached'] : [`${scope.base}...HEAD`];
+  const listing = await git(cwd, ['diff', '--name-only', '--no-renames', '--relative', '-z', ...range, '--']);
+
+  return listing
+    .split('\0')
+    .filter((file) => file !== '')
+    .sort();
+}
