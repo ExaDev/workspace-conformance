@@ -1,3 +1,13 @@
+## [4.0.2](https://github.com/ExaDev/workspace-conformance/compare/v4.0.1...v4.0.2) (2026-10-29)
+
+### Bug Fixes
+
+* list every commit type in the release notes ([7cad2af](https://github.com/ExaDev/workspace-conformance/commit/7cad2af829f2c0c3003746eaac7aee7a17906642))
+
+### Documentation
+
+* list the commits behind each release that had an empty changelog entry ([a8e96ed](https://github.com/ExaDev/workspace-conformance/commit/a8e96edb64a06757f6c43c78167086b84bc1d931))
+
 ## [4.0.1](https://github.com/ExaDev/workspace-conformance/compare/v4.0.0...v4.0.1) (2026-10-03)
 
 ### Continuous Integration
