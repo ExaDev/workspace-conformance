@@ -1,5 +1,11 @@
 ## [4.0.1](https://github.com/ExaDev/workspace-conformance/compare/v4.0.0...v4.0.1) (2026-10-03)
 
+### Continuous Integration
+
+* let Dependabot propose npm updates after a week's cooldown ([61e0d17](https://github.com/ExaDev/workspace-conformance/commit/61e0d1713727cb22086aa4bc6f3758b3a134cc37))
+* lint workflows with actionlint and zizmor ([55471b2](https://github.com/ExaDev/workspace-conformance/commit/55471b2f3a724aca4c9f1a3af8b973fcd6099d39))
+* stop persisting checkout credentials and expanding needs into shell ([a87d391](https://github.com/ExaDev/workspace-conformance/commit/a87d391a4fcec632e89f1d8413ccf6921036337e))
+
 # [4.0.0](https://github.com/ExaDev/workspace-conformance/compare/v3.0.0...v4.0.0) (2026-10-03)
 
 
@@ -54,6 +60,10 @@ required_linear_history rule applies to the branch, else false.
 * **type-level:** parse the default library once and skip checking it ([9bfcf78](https://github.com/ExaDev/workspace-conformance/commit/9bfcf789c343a003863a03ae1de15ee0f11fbbc5))
 
 ## [2.0.1](https://github.com/ExaDev/workspace-conformance/compare/v2.0.0...v2.0.1) (2026-10-03)
+
+### Continuous Integration
+
+* pin third-party actions by commit SHA ([33d95fa](https://github.com/ExaDev/workspace-conformance/commit/33d95fa0d01fc26286be293fd1f7a0482d9ab243))
 
 # [2.0.0](https://github.com/ExaDev/workspace-conformance/compare/v1.7.0...v2.0.0) (2026-10-03)
 
@@ -127,7 +137,29 @@ unified: { merge, presetSchema } and standalone: { merge, presetSchema }.
 
 ## [1.2.2](https://github.com/ExaDev/workspace-conformance/compare/v1.2.1...v1.2.2) (2026-10-02)
 
+### Documentation
+
+* describe the release process and the protection of main ([fb9fb2b](https://github.com/ExaDev/workspace-conformance/commit/fb9fb2b08da1ed57135ad1c4a476a774f2c2ced3))
+
 ## [1.2.1](https://github.com/ExaDev/workspace-conformance/compare/v1.2.0...v1.2.1) (2026-10-02)
+
+### Documentation
+
+* **ci:** say the npm pin was chosen through the release-age gate, not enforced by it ([b063019](https://github.com/ExaDev/workspace-conformance/commit/b06301990fbc5eb2f30ba38665b923291492a8b4))
+* **release:** state that semantic-release falls back to an https token URL when the SSH push fails ([7ceb6a2](https://github.com/ExaDev/workspace-conformance/commit/7ceb6a282dd71de04390726efa5a9ca15f3020c9))
+* say an https release URL pushes as GITHUB_TOKEN ([c3dc57d](https://github.com/ExaDev/workspace-conformance/commit/c3dc57d214f657e4b581ecc0c9ca6a4b17d2d475))
+* state exactly what the release job's credential scoping mitigates ([4180be8](https://github.com/ExaDev/workspace-conformance/commit/4180be8e343a31e578a09e0b15e89b5602e29b94))
+
+### Continuous Integration
+
+* allow only the ssh protocol in the release step ([3168874](https://github.com/ExaDev/workspace-conformance/commit/31688748df33162283ef168cc60662db5b3b52e2))
+* assert the release preflight URL matches repositoryUrl ([aa08a2a](https://github.com/ExaDev/workspace-conformance/commit/aa08a2aa1ef9e98f8a8b27c30db6ea51fe743bbd))
+* build before the deploy key exists and publish without lifecycle scripts ([e6f28a7](https://github.com/ExaDev/workspace-conformance/commit/e6f28a714620567adb9d11d0c9f6d3f6173a74b3))
+* call ssh by absolute path with no config file in the release step ([d8a2add](https://github.com/ExaDev/workspace-conformance/commit/d8a2addab4dbd3051c1c2bfc9031414b9acc6772))
+* force the release preflight push so a behind HEAD does not fail it ([163c7c1](https://github.com/ExaDev/workspace-conformance/commit/163c7c1eded2c935129f5168316496fbebb4492c))
+* pin the release job's actions by commit SHA ([f9142f2](https://github.com/ExaDev/workspace-conformance/commit/f9142f21c32c18a768a36d1e3d551b72d6d1c9f6))
+* provision the release deploy key only for the semantic-release step ([9b3efcf](https://github.com/ExaDev/workspace-conformance/commit/9b3efcf6adfcec94f9e7229387b5522809842605))
+* push the release commit and tag over SSH with a deploy key ([7600dfa](https://github.com/ExaDev/workspace-conformance/commit/7600dfa7d23f53b136b2c9795401d40ffe6b96aa))
 
 # [1.2.0](https://github.com/ExaDev/workspace-conformance/compare/v1.1.0...v1.2.0) (2026-10-02)
 
