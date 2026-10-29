@@ -1,3 +1,9 @@
+## [4.0.3](https://github.com/ExaDev/workspace-conformance/compare/v4.0.2...v4.0.3) (2026-10-29)
+
+### Documentation
+
+* add the standard badge row to the README ([ec3bf4f](https://github.com/ExaDev/workspace-conformance/commit/ec3bf4fb8bba33b48b5fa43bf3993a9405dafa3f))
+
 ## [4.0.2](https://github.com/ExaDev/workspace-conformance/compare/v4.0.1...v4.0.2) (2026-10-29)
 
 ### Bug Fixes
