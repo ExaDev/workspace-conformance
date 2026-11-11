@@ -3,6 +3,7 @@ import { relative } from 'node:path';
 import { ConfigValidationError, type LayoutConfig } from '@exadev/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createGitWorkspace } from '../test/support/git-workspace';
 import { importsLayout } from '../test/support/layouts';
 import { fixturePath, makeTempDir, removeTempDirs, writeFiles } from '../test/support/temp';
 import type { ConformanceConfig } from './config';
@@ -151,6 +152,32 @@ describe('runChecks with configFiles', () => {
   });
 });
 
+describe('runChecks narrowed to files', () => {
+  it('reports only the violations about the files named, and every one without them', async () => {
+    const config: ConformanceConfig = { checks: { 'instruction-symlinks': {} } };
+    const cwd = await createGitWorkspace({ 'README.md': '# x\n', 'AGENTS.md': '# x\n', 'CLAUDE.md': '# x\n' });
+
+    expect((await runChecks({ cwd, config })).violations.map((violation) => violation.file)).toEqual(['AGENTS.md', 'CLAUDE.md']);
+    expect((await runChecks({ cwd, config, files: ['CLAUDE.md', 'README.md'] })).violations.map((violation) => violation.file)).toEqual(['CLAUDE.md']);
+    expect((await runChecks({ cwd, config })).files).toBeUndefined();
+  });
+
+  it('reports a violation about a directory when a file under it is named, and none when no file under it is', async () => {
+    const config: ConformanceConfig = { checks: { 'single-storybook': {} } };
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, { 'packages/ui/.storybook/main.ts': 'export default {};\n', 'packages/ui/.storybook-notes.md': 'x\n' });
+
+    expect((await runChecks({ cwd, config, files: ['packages/ui/.storybook/main.ts'] })).violations.map((violation) => violation.code)).toEqual(['single-storybook/misplaced']);
+    expect((await runChecks({ cwd, config, files: ['packages/ui/.storybook-notes.md'] })).violations).toEqual([]);
+  });
+
+  it('reports a violation naming a path that does not exist, since no change can be tied to it', async () => {
+    const cwd = await makeTempDir();
+
+    expect((await runChecks({ cwd, config: { checks: { 'commit-types': {} } }, files: [] })).violations.map((violation) => violation.code)).toContain('commit-types/missing-config');
+  });
+});
+
 describe('runChecks with the settings checks', () => {
   const settings: ConformanceConfig = { checks: { 'workflow-merge-group': { repository: 'example-org/example-repo' }, 'settings-review-thread-resolution': { repository: 'example-org/example-repo' } } };
   const github: GitHubClient = {
@@ -169,6 +196,13 @@ describe('runChecks with the settings checks', () => {
 
     expect(result.results.map((entry) => entry.check)).toEqual(['workflow-merge-group', 'settings-review-thread-resolution']);
     expect(result.violations.map((violation) => violation.code)).toEqual(['settings-review-thread-resolution/not-required']);
+  });
+
+  it('narrowed to files, keeps the violations about the repository, which are about no file, and says what it was narrowed to', async () => {
+    const result = await runChecks({ cwd: fixturePath('workflows', 'merge-group', 'clean'), config: settings, github, files: [] });
+
+    expect(result.violations.map((violation) => violation.code)).toEqual(['settings-review-thread-resolution/not-required']);
+    expect(result.files).toEqual([]);
   });
 
   it('fails when only settings checks are enabled and there is no client, rather than reporting a pass', async () => {

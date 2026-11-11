@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 
 import type { Violation } from './check';
 import { ConformanceError } from './errors';
+import { type ChangeScope, changedFiles } from './git';
 import { createGitHubClient, type GitHubClient } from './github';
 import { relativePosix } from './paths';
 import type { CheckName } from './options';
@@ -28,7 +29,7 @@ function isFormat(value: string): value is Format {
   return FORMATS.some((format) => format === value);
 }
 
-const USAGE = `Usage: workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings] [--format <text|json|github>]
+const USAGE = `Usage: workspace-conformance check [--cwd <directory>] [--check <name>]... [--list] [--settings] [--staged | --base <rev>] [--format <text|json|github>]
 
 Runs the conformance checks enabled in the 'conformance' section of exadev.config.ts (or exadev.conformance.config.ts).
 
@@ -36,6 +37,8 @@ Runs the conformance checks enabled in the 'conformance' section of exadev.confi
   --check <name>      Run only this check, which must be enabled. Repeatable.
   --list              Print the names of all checks and stop.
   --settings          Also run the enabled settings-* checks, which read the repository's settings through the GitHub API with the token in GITHUB_TOKEN or GH_TOKEN. Offline otherwise.
+  --staged            Report only violations about the files staged in the git index, for a pre-commit hook. The checks still read the whole workspace.
+  --base <rev>        Report only violations about the files the commits since the merge base of <rev> and HEAD change, for a pre-push hook or a pull request.
   --format <format>   text (the default): violations on standard error, notes on standard output. json: the result as one JSON document on standard output. github: a GitHub Actions error annotation per violation on standard output.
   --help, -h          Show this message.
 
@@ -102,7 +105,13 @@ function formatOf(value: string | undefined): Format {
 }
 
 function summaryOf(result: RunResult): string {
-  return `no violations from ${result.results.map((entry) => entry.check).join(', ')}\n`;
+  const { files } = result;
+  const checks = result.results.map((entry) => entry.check).join(', ');
+  if (files === undefined) {
+    return `no violations from ${checks}\n`;
+  }
+
+  return `no violations in ${String(files.length)} changed file${files.length === 1 ? '' : 's'} from ${checks}\n`;
 }
 
 /**
@@ -142,6 +151,26 @@ function requestedChecks(names: readonly string[]): readonly CheckName[] {
 }
 
 /**
+ * What `--staged` and `--base` scope the run to, or `undefined` when neither is given. They are two answers to one question, so both together is a usage error.
+ */
+function scopeOf(staged: boolean | undefined, base: string | undefined): ChangeScope | undefined {
+  if (staged === true && base !== undefined) {
+    throw new TypeError('--staged and --base each choose the files to report on; give one of them');
+  }
+  if (staged === true) {
+    return { staged: true };
+  }
+  if (base?.trim() === '') {
+    throw new TypeError('--base needs a revision; it was given an empty one, which would compare HEAD with itself and check nothing');
+  }
+  if (base?.startsWith('-') === true) {
+    throw new TypeError(`--base takes a revision, not an option: '${base}'`);
+  }
+
+  return base === undefined ? undefined : { base };
+}
+
+/**
  * The client the settings checks read through, authenticated by the first non-empty token of `GITHUB_TOKEN` and `GH_TOKEN`.
  */
 function clientFromEnvironment(): GitHubClient {
@@ -156,7 +185,16 @@ function clientFromEnvironment(): GitHubClient {
 async function runCheck(args: readonly string[], output: CommandOutput): Promise<number> {
   const { values } = parseArgs({
     args: [...args],
-    options: { cwd: { type: 'string' }, check: { type: 'string', multiple: true }, list: { type: 'boolean' }, settings: { type: 'boolean' }, format: { type: 'string' }, help: { type: 'boolean', short: 'h' } },
+    options: {
+      cwd: { type: 'string' },
+      check: { type: 'string', multiple: true },
+      list: { type: 'boolean' },
+      settings: { type: 'boolean' },
+      staged: { type: 'boolean' },
+      base: { type: 'string' },
+      format: { type: 'string' },
+      help: { type: 'boolean', short: 'h' },
+    },
     allowPositionals: false,
   });
   if (values.help === true) {
@@ -173,8 +211,15 @@ async function runCheck(args: readonly string[], output: CommandOutput): Promise
     return EXIT_CODES.clean;
   }
   const format = formatOf(values.format);
+  const scope = scopeOf(values.staged, values.base);
   const cwd = values.cwd ?? process.cwd();
-  const result = await runChecks({ cwd, ...(requested === undefined ? {} : { checks: requested }), ...(values.settings === true ? { github: clientFromEnvironment() } : {}) });
+  const files = scope === undefined ? undefined : await changedFiles(cwd, scope);
+  const result = await runChecks({
+    cwd,
+    ...(requested === undefined ? {} : { checks: requested }),
+    ...(values.settings === true ? { github: clientFromEnvironment() } : {}),
+    ...(files === undefined ? {} : { files }),
+  });
   printResult(result, format, cwd, output);
 
   return result.exitCode;

@@ -1,3 +1,4 @@
+import { lstat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { type ConfigFileOptions, type LayoutConfig, layoutSection, loadSection } from '@exadev/config';
@@ -44,6 +45,10 @@ export interface RunChecksOptions {
    * The client the settings checks (`settings-*`) read the repository through. They run only when it is given, so a run without it stays offline and needs no token; naming one of them in `checks` without a client is an error.
    */
   readonly github?: GitHubClient;
+  /**
+   * Report only the violations about these files, relative to `cwd` with `/` separators, such as the files a commit or a branch changes. The checks still read the whole workspace, so a cross-file check sees everything; only what is reported is narrowed. A violation about a directory is reported when a file under it is named; violations about the repository's settings, and violations naming a path that does not exist (a missing config file, a pattern), cannot be tied to a change and are always reported. Every violation is reported when omitted.
+   */
+  readonly files?: readonly string[];
 }
 
 /**
@@ -74,6 +79,10 @@ export interface RunResult {
    * {@link EXIT_CODES}`.clean` when there are no violations, else {@link EXIT_CODES}`.violations`.
    */
   readonly exitCode: typeof EXIT_CODES.clean | typeof EXIT_CODES.violations;
+  /**
+   * The files the violations were narrowed to, when the run was given `files`.
+   */
+  readonly files?: readonly string[];
 }
 
 async function conformanceOf(options: RunChecksOptions): Promise<ConformanceConfig> {
@@ -169,6 +178,30 @@ function readImported(imported: ReadonlyMap<string, readonly Violation[]>, name:
 }
 
 /**
+ * Whether a run narrowed to the files `changed` reports `violation`. A violation about the repository's settings is about no file and always is. A violation about a file is when that file changed, or, when it names a directory (`single-storybook` reports the Storybook directory), when a file under it changed. A violation that names nothing in the workspace (a config file that is missing, a pattern that matched nothing) cannot be tied to a change, so it is reported too rather than hidden.
+ */
+async function reported(cwd: string, violation: Violation, changed: ReadonlySet<string>): Promise<boolean> {
+  if (violation.file === undefined || changed.has(violation.file)) {
+    return true;
+  }
+  const prefix = `${violation.file.replace(/\/$/u, '')}/`;
+  if ([...changed].some((file) => file.startsWith(prefix))) {
+    return true;
+  }
+
+  return lstat(resolve(cwd, violation.file)).then(
+    () => false,
+    () => true,
+  );
+}
+
+async function inScope(cwd: string, found: readonly Violation[], changed: ReadonlySet<string>): Promise<readonly Violation[]> {
+  const kept = await Promise.all(found.map(async (violation) => reported(cwd, violation, changed)));
+
+  return found.filter((_violation, index) => kept[index] === true);
+}
+
+/**
  * Run the enabled checks, or the enabled ones among `checks`, and return what they found. Sections not supplied in the options are loaded from `cwd` with `@exadev/config`.
  *
  * Violations do not throw. It throws `ConformanceError` when the checks cannot run (nothing enabled, a requested check disabled, a section missing) and `ConfigValidationError` when a section fails its schema, whether it was loaded from `cwd` or passed in.
@@ -183,6 +216,7 @@ export async function runChecks(given: RunChecksOptions): Promise<RunResult> {
   );
 
   const imported = await runImportGraphChecks(options.cwd, layout, names, config.checks);
+  const scope = options.files === undefined ? undefined : new Set(options.files);
 
   const results: CheckResult[] = [];
   for (const name of names) {
@@ -191,10 +225,11 @@ export async function runChecks(given: RunChecksOptions): Promise<RunResult> {
     const note = (text: string): void => {
       notes.push(text);
     };
-    const violations = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles, github: options.github, note }) : readImported(imported, name);
+    const found = 'run' in check ? await check.run({ cwd: options.cwd, checks: config.checks, layout, configFiles: options.configFiles, github: options.github, note }) : readImported(imported, name);
+    const violations = scope === undefined ? found : await inScope(options.cwd, found, scope);
     results.push({ check: name, violations, notes });
   }
   const violations = results.flatMap((result) => result.violations);
 
-  return { results, violations, exitCode: violations.length === 0 ? EXIT_CODES.clean : EXIT_CODES.violations };
+  return { results, violations, exitCode: violations.length === 0 ? EXIT_CODES.clean : EXIT_CODES.violations, ...(options.files === undefined ? {} : { files: options.files }) };
 }
