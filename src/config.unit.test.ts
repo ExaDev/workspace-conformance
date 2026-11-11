@@ -27,6 +27,7 @@ describe('conformanceSchema', () => {
         'import-rank-skip': { exclude: ['^x/'], doNotFollow: ['^y/'], tsConfig: 'tsconfig.json' },
         'import-cross-slice': false,
         'instruction-symlinks': { files: ['AGENTS.md'], directories: ['.'], target: 'README.md' },
+        'instruction-file-size': { files: ['CLAUDE.md'], directories: ['.', 'packages/*'], maxCharacters: 20_000, followImports: false },
         'single-storybook': { location: '.', exclude: ['test/fixtures/**'] },
         'commit-types': { commitlint: 'c.ts', release: 'r.ts' },
         'engines-floor': { packages: ['.', 'packages/*', '!packages/private'] },
@@ -115,6 +116,12 @@ describe('conformanceSchema', () => {
     expect(await issuesOf({ checks: { eslint: { samples: ['a.js'], rules: { 'no-console': 'off' } } } })).toBeDefined();
     expect(await issuesOf({ checks: { eslint: { samples: [{ path: 'a.js', except: ['x'] }] } } })).toBeDefined();
     expect(await issuesOf({ checks: { eslint: { samples: ['a.js'], lint: 'yes' } } })).toBeDefined();
+  });
+
+  it('rejects an instruction-file-size limit that is not a positive whole number of characters', async () => {
+    expect(await issuesOf({ checks: { 'instruction-file-size': { maxCharacters: 0 } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'instruction-file-size': { maxCharacters: 1.5 } } })).toBeDefined();
+    expect(await issuesOf({ checks: { 'instruction-file-size': { followImports: 'yes' } } })).toBeDefined();
   });
 
   it('rejects empty paths, empty lists of globs and options of the wrong type', async () => {

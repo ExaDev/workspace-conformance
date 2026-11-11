@@ -40,6 +40,21 @@ export async function indexEntry(cwd: string, path: string): Promise<IndexEntry 
 }
 
 /**
+ * The index entry for exactly the file `path` (relative to `cwd`), or `undefined` when git tracks no file at that path. Unlike {@link indexEntry}, `path` is never read as a pathspec, so a directory or a glob names nothing rather than the first file it matches.
+ */
+export async function exactIndexEntry(cwd: string, path: string): Promise<IndexEntry | undefined> {
+  const listing = await git(cwd, ['--literal-pathspecs', 'ls-files', '--stage', '-z', '--', path]);
+  for (const line of listing.split('\0')) {
+    const match = /^(\d+) ([0-9a-f]+) \d\t(.*)$/su.exec(line);
+    if (match?.[3] === path && match[1] !== undefined && match[2] !== undefined) {
+      return { mode: match[1], blob: match[2] };
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * The content of a blob. For a symbolic link it is the link's target.
  */
 export async function blobContent(cwd: string, blob: string): Promise<string> {

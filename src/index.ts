@@ -25,6 +25,7 @@ export { importCycles } from './checks/import-cycles';
 export { importIsolatedGroups } from './checks/import-isolated-groups';
 export { importRankSkip } from './checks/import-rank-skip';
 export { importUphill } from './checks/import-uphill';
+export { DEFAULT_MAX_INSTRUCTION_CHARACTERS, instructionFileSize } from './checks/instruction-file-size';
 export { instructionSymlinks } from './checks/instruction-symlinks';
 export { migrationsDirectory } from './checks/migrations-directory';
 export { settingsMergeMethods } from './checks/settings-merge-methods';
@@ -59,6 +60,7 @@ export type {
   EslintRequiredSeverity,
   EslintSample,
   ImportGraphOptions,
+  InstructionFileSizeOptions,
   InstructionSymlinksOptions,
   MigrationsDirectoryOptions,
   PinningLevel,

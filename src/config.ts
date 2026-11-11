@@ -106,6 +106,11 @@ const checks: z.ZodType<ChecksConfig, ChecksConfig> = z.strictObject({
   'instruction-symlinks': z.exactOptional(
     enabled(z.strictObject({ files: z.exactOptional(paths), directories: z.exactOptional(paths), target: z.exactOptional(path) })),
   ),
+  'instruction-file-size': z.exactOptional(
+    enabled(
+      z.strictObject({ files: z.exactOptional(paths), directories: z.exactOptional(paths), maxCharacters: z.exactOptional(z.int().positive()), followImports: z.exactOptional(z.boolean()) }),
+    ),
+  ),
   'single-storybook': z.exactOptional(enabled(z.strictObject({ location: z.exactOptional(path), exclude: z.exactOptional(paths) }))),
   'commit-types': z.exactOptional(enabled(z.strictObject({ commitlint: z.exactOptional(path), release: z.exactOptional(path) }))),
   'engines-floor': z.exactOptional(enabled(z.strictObject({ packages: z.exactOptional(paths) }))),
