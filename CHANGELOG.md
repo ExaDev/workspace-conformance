@@ -1,3 +1,9 @@
+## [4.0.4](https://github.com/ExaDev/workspace-conformance/compare/v4.0.3...v4.0.4) (2026-11-23)
+
+### Bug Fixes
+
+* pin the runner-fallback action to the version that sends public repositories to hosted runners ([2dac052](https://github.com/ExaDev/workspace-conformance/commit/2dac052c173f92a1322a27dff6194d48ed8b0409))
+
 ## [4.0.3](https://github.com/ExaDev/workspace-conformance/compare/v4.0.2...v4.0.3) (2026-10-29)
 
 ### Documentation
